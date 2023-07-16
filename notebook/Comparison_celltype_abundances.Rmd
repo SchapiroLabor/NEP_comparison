@@ -1,0 +1,264 @@
+---
+title: "Celltype_check"
+author: "Chiara Schiller"
+date: "2023-06-29"
+output: html_document
+---
+This script creates a baseline for the simulated datasets to check, if cohorts can be distinguished based on simulated data. 
+
+###Settings
+```{r}
+# load necessary packages
+library(foreach)
+library(doParallel)
+library(readr)
+library(proxy)
+library(ggplot2)
+library(tidyverse)
+library(factoextra)
+library(pheatmap)
+library(foreach)
+library(caret)
+library(randomForest)
+
+
+# set number of cores to use (adjust as needed)
+num.cores <- 4
+
+# initialize parallel processing
+cl <- makeCluster(num.cores)
+registerDoParallel(cl)
+
+# define function to read csv files and extract x, y, and ct columns
+files = list.files("./../../../../data/Sim_nbh15_asym01_1000_grid0.2_1kiter_025kswap/", pattern = ".csv")
+data_path = "./../../../../data/Sim_nbh15_asym01_1000_grid0.2_1kiter_025kswap/"
+```
+
+Load and format data
+```{r}
+# calculate distance matrix and interaction matrix for each dataset
+abundances <- foreach(i = 1:length(files), .combine = rbind) %dopar% {
+  df <- readr::read_csv(paste0(data_path,files[i]))
+  df = prop.table(table(df$ct))
+  return(df)
+}
+# stop parallel processing
+stopCluster(cl)
+
+abundances = as.data.frame.matrix(abundances)
+rownames(abundances) = files
+
+```
+
+Split comparison groups. We compare the different preference groups within abundandes
+```{r}
+abundances$preference <- sub("_ab.*$", "", rownames(abundances))
+abundances$preference <- sub("_ab.*$", "", abundances$preference)
+abundances$abundance <- sub(".*ab", "ab", rownames(abundances))
+abundances$abundance = sub("_[0-9]+.csv$", "",abundances$abundance)
+abundances$abundance = sub("_sim", "", abundances$abundance)
+```
+
+Name convention for cohort comparison
+```{r}
+# prepare lists
+df_comb = list()
+#split_string <- strsplit(data, "4ct")
+all = list()
+all[[1]] = abundances
+
+# now loop through every combination of abundances are preferences to compare all tools withtin their abundances
+for (i in 1:length(all)){
+  combs <- combn(unique(all[[i]]$preference), 2)
+  pref_comb <- apply(combs, 2, function(x) c(as.character(x[1]), as.character(x[2])))
+  for (a in unique(all[[i]]$abundance)){
+  df = all[[i]] %>% filter(abundance == a)
+    for (p in 1:ncol(pref_comb)){
+      df2 = df %>% filter(preference %in% pref_comb[,p]) 
+      df_comb[[paste("abundances", unique(df2$abundance), unique(df2$preference)[1], "vs", unique(df2$preference)[2], sep = "_")]] = df2 %>% select(-preference, -abundance)
+      #df_comb[[paste(sub("_+$", "", split_string[[i]][1]), unique(df2$abundance), paste(pref_comb[,p], sep = "_vs_"), sep = "_")]] = df2
+      }
+    }
+  }
+
+# these are the comparisons we have:
+names = names(df_comb)
+names(df_comb)
+all = df_comb
+```
+
+Make Heatmaps for every comparison
+```{r}
+for (i in 1:length(all)){
+  pheatmap(all[[i]], treeheight_row = 0, treeheight_col = 0, main = names(all)[i], cluster_rows = F)
+}
+```
+
+### Performance comparison
+
+Set functions for random forest and F1 statistics
+```{r}
+stat = list()
+# Load required packages
+library(caret)
+library(randomForest)
+# Create an index variable for the two groups
+group_index <- rep(c("A","B"), each=100)
+
+# write F1 and FDR function
+# Calculate the F1 score
+F1_Score <- function(predictions, actual) {
+  TP <- sum(predictions == "B" & actual == "B")
+  FP <- sum(predictions == "B" & actual == "A")
+  FN <- sum(predictions == "A" & actual == "B")
+  precision <- TP / (TP + FP)
+  recall <- TP / (TP + FN)
+  F1 <- 2 * precision * recall / (precision + recall)
+  FDR <- FP / (TP + FP)
+  return(c(F1, FDR))
+}
+
+# Set seed for reproducibility
+set.seed(123)
+```
+
+
+Random forest
+
+Fix connection issue if error occusr. Just run this chunk once and it resets any parallel computing settings.
+```{r}
+unregister_dopar <- function() {
+  env <- foreach:::.foreachGlobals
+  rm(list=ls(name=env), pos=env)
+}
+unregister_dopar()
+```
+
+Train and test a random forest classifier with 80/20 split for each comparison of two cohorts with 100 samples each.
+Extract F1 score and feature importances for qualitative and quantitative performance evaluation.
+Parallelize 100 iterations.
+```{r}
+# Set the number of cores to use
+num_cores <- 6
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+importances = list()
+# Set the number of iterations
+num_iterations <- 100
+
+# Create a list to store the results
+stat <- list()
+
+# Loop over the data
+foreach(i = 1:length(all), .combine = c, .packages = c("caret","randomForest")) %dopar% {
+  # Combine index variable with data
+  data <- cbind(all[[i]], group_index)
+  # Create a list to store the results for this iteration
+  result <- list()
+  
+  for (x in 1:num_iterations){
+    # Split data into training and test sets
+    trainIndex <- caret::createDataPartition(data$group_index, p = 0.8, list = FALSE, times = 1)
+    train <- data[trainIndex, ]
+    test <- data[-trainIndex, ]
+
+    # Define the model
+    model <- caret::train(group_index ~ ., data = train, method = "rf", trControl = trainControl(method = "cv", number = 5))
+    
+    # Make predictions on the test set
+    predictions <- predict(model, newdata = test)
+
+    # Store the result for this iteration
+    importances[[x]] <- varImp(model$finalModel)
+    result[[x]] <- F1_Score(predictions, test$group_index)
+  }
+  # Combine the results for this iteration into the stat list
+  names(importances) <- paste(i, seq_along(importances), sep = "_")
+  names(result) <- paste(i, seq_along(result), sep = "_")
+  list(result, importances)
+} -> result_list
+
+# Stop the parallel backend
+stopCluster(cl)
+registerDoSEQ()
+```
+
+Extract F1 score statistics per comparison
+```{r}
+stat = list()
+
+F1 = result_list[seq(1, length(result_list), by = 2)]
+# Combine the results into the stat list
+for (i in seq_along(F1)) {
+  
+  stat[[i]] <- do.call("rbind", F1[[i]])
+}
+
+### optional: Save or reload result_list data from random forest run
+#saveRDS(result_list, "./../../results_4ct_asym_0.2grid_self/variedSpatialLDA_result_list_4ct_cross01.rds")
+#see = readRDS("./../../results_4ct_cross01/count_histoCATSEA_result_list_4ct_cross01.rds")
+
+#result_list = readRDS("./../../results_4ct_sym_0.2grid_self/missspatialLDA_result_list_4ct_self00.rds")
+# loading results wo spatialLDA
+#all = all[c(1:length(all)) %notin% grep("SpatialLDA", names(all))]
+```
+
+Format statistics results correctly
+
+```{r}
+df = as.data.frame.matrix(do.call("rbind", stat))
+df$tool = rep(names(all), each = 100)
+colnames(df) = c("F1", "FDR", "Run")
+
+split_strings <- sapply(df$Run, function(x) {
+  split_string <- strsplit(x, "[Ss]im")
+  part_before_sim <- sub("_+$", "", split_string[[1]][1])
+  part_after_sim <- paste("sim", split_string[[1]][2], sep = "")
+  return(list(part_before_sim, part_after_sim))
+})
+# Get the parts before and after "sim"
+df$comparison <- sub(".*_ab", "ab", df$Run)
+# this is the comaprison without abundance: df$comparison <- sub(".*_ab._[0-9]\\.[0-9]*_", "", names(all)), just took me long and I did not want to delete it
+df$tool <- sub("_ab.*", "", df$Run)
+df$abundance = sub("^(.+?)_[^_]+_(.*)", "\\1", df$comparison)
+  
+```
+
+Create boxplot to compare F1 scores
+```{r, fig.width=20, fig.height = 7}
+# exclude sigval value in histocat
+df$abundance = sub("^(.+?)_[^_]+_(.*)", "\\1", df$comparison)
+# separate the comparison column into two columns using separate() function
+df$comparison_preference = sub("^[^_]*_[^_]*_", "", df$comparison)
+#df_sort <- df[order(df$abundance, df$tool),]
+#df_sort$abundance_ct_0 = sub("^ab0_", "", df_sort$abundance)
+df$abundance_ct_0 = sub("^ab0_", "", df$abundance)
+df$comparison_preference = as.factor(df$comparison_preference)
+
+# rename tool names if necessary
+
+df$tool = sub("SEA_bi_100iter_direction_delaunay", "SEA_bi_direction_delaunay", df$tool)
+df$tool = sub("IMCR_histoCAT_delaunay_p_lt", "IMCR_histoCAT_delaunay", df$tool)
+df$tool = rep("abundances D2", nrow(df))
+
+df$comparison = sub("ran_vs_self", "", "")
+df$tool = sub("10motifs", "k9_10motifs", df$tool)
+
+# optional: shortly subset:
+#df = df %>% filter(tool != "Giotto_delaunay")
+pdf("./../../results_4ct_asym_0.2grid_self/plots/asym_cross01_abundances_F1.pdf", width = 4.5, height = 4.5)
+ggplot(df, aes(x = factor(abundance_ct_0), y = F1, color = comparison_preference, group = interaction(comparison_preference, abundance_ct_0))) +
+  geom_boxplot() +
+  facet_grid(. ~ tool) +
+  theme_test()  +
+  theme(axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5, hjust = 1)) +
+  xlab("Abundance ct 0") +
+  ylab("F1 score (random forest)") +
+  scale_x_discrete(labels=c('0.12 - 0.18', '0.15 - 0.20', '0.17 - 0.22', '0.22 - 0.23', '0.25')) +
+  scale_color_discrete(name = "Cohort comparison") +
+  scale_colour_brewer(palette = "Dark2")
+dev.off()
+
+```
+
+

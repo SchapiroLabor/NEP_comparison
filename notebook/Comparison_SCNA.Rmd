@@ -1,4 +1,4 @@
----
+
 ---
 title: "Comparison_SCNA"
 author: "Chiara Schiller"
@@ -9,6 +9,7 @@ output: html_document
 ## Compare all tools, results saved in folder 2 up
 
 ```{r}
+
 # Install packages
 library(FactoMineR)
 library(ggcorrplot)
@@ -24,7 +25,7 @@ library(tidyverse)
 
 Load in all different result files
 ```{r}
-csv_dir = "./../../results_4ct_sym_0.2grid_self/"
+csv_dir = "./../../results_4ct_sym/"
 data <- list.files(path = csv_dir, recursive = FALSE, pattern = "\\.csv$")
 all = list()
 for (i in 1:length(data)){
@@ -33,22 +34,54 @@ for (i in 1:length(data)){
   rownames(all[[i]]) = as.vector(all[[i]][,1])
   rownames(all[[i]]) = sub(".csv", "", rownames(all[[i]]))
   all[[i]] = all[[i]][,-1]
-}
+
 
 # switch interactions colnames Misty
-colnames(all[[i]]) = sub("juxta_", "", colnames(all[[i]]))
-colnames(all[[i]]) = sub("ct", "", colnames(all[[i]]))
-colnames(all[[i]]) = sub("ct", "",colnames(all[[i]]))
-colnames(all[[i]]) = sub("(.*)_(.*)", "\\2_\\1", colnames(all[[i]]))
+colnames(all[[i]]) = sub("(.*)_(.*)", "\\2_\\1", colnames(all[[i]]))}
+
+#switch back for histoCAT
+for(i in grep("histo", data)){
+  colnames(all[[i]]) = sub("(.*)_(.*)", "\\2_\\1", colnames(all[[i]]))
+  }
 
 ```
-Make 16 features for GIOTTO
+Make 16 features for GIOTTO -- gives later error, see how to solve it for Giotto
 
 ```{r}
-dob = all[[i]][, !colnames(all[[i]]) %in% c("0_0", "1_1", "2_2", "3_3")]
-colnames(dob) = sub("(.*)_(.*)", "\\2_\\1", colnames(dob))
+giotto_inidces <- which(sapply(all, function(df) ncol(df) == 10))
 
-all[[i]] = cbind(all[[i]] , dob)
+for (i in giotto_inidces){
+  dob = all[[i]][, !colnames(all[[i]]) %in% c("0_0", "1_1", "2_2", "3_3")]
+  colnames(dob) = sub("(.*)_(.*)", "\\2_\\1", colnames(dob))
+  all[[i]] = cbind(all[[i]] , dob)
+}
+
+
+##make all datasets the same order and without any numbers in the feature names
+modify_row_names <- function(row_name) {
+  numbers <- gsub("\\D", "", row_name)
+  modified_name <- paste(strsplit(numbers, "")[[1]], collapse = "_")
+  return(modified_name)
+}
+
+for (i in 1:length(all)){
+    colnames(all[[i]]) <- as.vector(sapply(colnames(all[[i]]), modify_row_names))
+    }
+
+
+# correct order for ground truth later 
+ordered_cols <- c("0_0", "0_1", "0_2", "0_3", "1_0", "1_1", "1_2", "1_3", "2_0", "2_1", "2_2", "2_3", "3_0", "3_1", "3_2", "3_3")
+# Combine the results into the stat list
+for (i in 1:length(all)) {
+      # Reorder rows of dataset1 using the ordered row names
+      all[[i]] <- all[[i]][, ordered_cols , drop = FALSE]
+  }
+
+#look at correct names
+for (i in 1:length(all)){
+print(colnames(all[[i]]))
+  }
+
 ```
 
 
@@ -114,29 +147,7 @@ library(pheatmap)
 all = df_comb
 
 ```
-```{r}
-all[[1]]
-```
 
- 
- Chenge feature vector order in Misty and SEA
-```{r}
-i = 136
-
-for(i in grep("SEA_bi_", names(all))){
-  colnames(all[[i]]) = sub("X", "", colnames(all[[i]]))
-  colnames(all[[i]]) = sub("(.*)_(.*)", "\\2_\\1", colnames(all[[i]]))
-  }
-
-for(i in grep("Misty", names(all))){
-  colnames(all[[i]]) = sub("juxta_", "", colnames(all[[i]]))
-  colnames(all[[i]]) = sub("ct", "", colnames(all[[i]]))
-  colnames(all[[i]]) = sub("ct", "",colnames(all[[i]]))
-  colnames(all[[i]]) = sub("(.*)_(.*)", "\\2_\\1", colnames(all[[i]]))
-  }
-
-```
- 
 
  
 
@@ -145,8 +156,6 @@ Create heatmap for all to see, what to expect
 library(tidyverse)
 library(factoextra)
 library(pheatmap)
-
-all = df_comb
 
 
 for (i in 1:length(all)){
@@ -160,10 +169,10 @@ for (i in 1:length(all)){
 
 # save one plot to show purpose
 #
-png("./../../../../Figures/raw/Comparison/heatmap_SEA_0.24_0.6vsran.png", height = 400, width = 550, res = 150)
-colnames(all[[149]]) = sub("X", "", colnames(all[[150]]))
-pheatmap(all[[149]], treeheight_row = 0, treeheight_col = 0, show_rownames = FALSE)
-dev.off()
+#png("./../../../../Figures/raw/Comparison/heatmap_SEA_0.24_0.6vsran.png", height = 400, width = 550, res = 150)
+#colnames(all[[3]]) = sub("X", "", colnames(all[[3]]))
+#pheatmap(all[[3]], treeheight_row = 0, treeheight_col = 0, show_rownames = FALSE)
+#dev.off()
 
 
 #names(all)[102]
@@ -200,44 +209,28 @@ print(autoplot(pca_res, data = df, colour = 'group') +
 #dev.off()
 
 ```
-run random forest on all the datasets
+Create comparison of interactino score distributions
 ```{r}
-list_rf = list()
-stat = list()
-# generate initial dataset again
+# select column of interest (specific cell cell interaction)
+COI = 1
 
-for (i in 1:length(all))
-{
-  # play around, which samples you would like to have in
-sig_matrix <- as.matrix(all[[i]])
-#sig_matrix = sig_matrix[-c(101:200),]
-#labels <- rep(c("ran","self06","self045"), each=100)
-labels <- rep(c("A","B"), each=100)
 
-# Convert labels to a factor
-labels <- as.factor(labels)
-
-# Fit the model using k-fold cross-validation
-cv_rf <- rfsrc(labels ~ ., 
-               data = data.frame(sig_matrix, labels), 
-               ntree = 500, 
-               cv.fold = 10)
-
-# Print the cross-validation results, commented out for now
-#list_rf[[data[i]]] = cv_rf
-misclass_rate = mean(get.misclass.error(labels, cv_rf$class.oob))
-
-# accuracy and F1 score
-conf <- confusionMatrix(data=cv_rf$class.oob, reference = cv_rf$class)
-#Display results
-F1 = mean(conf$byClass[7])
-# FDR is 1 minus PPV
-FDR = 1 - mean(conf$byClass[3])
-#Precision = mean(conf$byClass[,5])
-stat[[i]] = c(F1, FDR)
+for (i in 1:length(all)){
+  groups = rep(unlist(strsplit(names(all[i]), "_vs_")), each = 100)
+  data = as.data.frame(cbind(rownames(all[[i]]), as.numeric(all[[i]][,COI]), groups))
+  data$V2 = as.numeric(data$V2)
+  
+  print(ggplot(data, aes(x = V2)) +
+  geom_histogram() +
+  facet_grid(. ~ groups) +
+  labs(title = names(all)[i], x = "interaction_value", y = "Frequency") +
+    theme_classic()
+  )
+  
 }
 
 ```
+
 
 Set functions for random forest and F1 statistics
 ```{r}
@@ -274,33 +267,6 @@ unregister_dopar <- function() {
 unregister_dopar()
 ```
 
-Run only once
-```{r}
-
-for (i in 1:length(all)){
-
-# Combine index variable with data
-data <- cbind(all[[i]], group_index)
-
-# Split data into training and test sets
-trainIndex <- createDataPartition(data$group_index, p = 0.8, list = FALSE, times = 1)
-train <- data[trainIndex, ]
-test <- data[-trainIndex, ]
-
-# Define the model
-model <- caret::train(group_index ~ ., data = train, method = "rf", trControl = trainControl(method = "cv", number = 5))
-
-# Make predictions on the test set
-predictions <- predict(model, newdata = test)
-
-
-
-stat[[i]] <- F1_Score(predictions, test$group_index)
-
-# View the F1 score
-}
-
-```
 
 Parallelize 100 iterations
 ```{r}
@@ -360,7 +326,7 @@ for (i in seq_along(F1)) {
   stat[[i]] <- do.call("rbind", F1[[i]])
 }
 
-#saveRDS(result_list, "./../../results_4ct_asym_0.2grid_self/Misty_cross/Misty_F1_correct_order.rds")
+saveRDS(result_list, "./../../results_4ct_sym/rf_result_lists/sym_complete.rds")
 #see = readRDS("./../../results_4ct_cross01/count_histoCATSEA_result_list_4ct_cross01.rds")
 
 #result_list = readRDS("./../../results_4ct_asym_0.2grid_self/Misty_cross/Misty_F1_correct_order.rds")
@@ -437,12 +403,11 @@ colnames(df) = c("F1", "FDR", "Run")
 
 length(names(all))
 # add F1 baseline
-#base = as.data.frame.matrix(stat_null)
-#base$tool = rep("F1_baseline", 100)
-#colnames(base) = c("F1", "FDR", "Run")
-
+base = as.data.frame.matrix(stat_null)
+base$tool = rep("F1_baseline", 100)
+colnames(base) = c("F1", "FDR", "Run")
 # bind baseline and toolresults together
-#df = rbind(df, base)
+df = rbind(df, base)
 
 ```
 
@@ -493,7 +458,7 @@ df$tool = sub("10motifs", "k9_10motifs", df$tool)
 #df = df %>% filter(tool != "Giotto_delaunay")
 #pdf("./../../results_4ct_sym_0.2grid_self/plots/sym_self00_comparison_abundance_boxplots_with_SpatialLDA.pdf", width = 24, height = 4.5)
 #pdf("./../../results_4ct_asym_0.2grid_self/plots/Giotto_F1_correct_order_asym.pdf", width = 4.5, height = 4.5)
-ggplot(df, aes(x = factor(abundance_ct_0), y = F1, color = comparison_preference, group = interaction(comparison_preference, abundance_ct_0))) +
+image = ggplot(df, aes(x = factor(abundance_ct_0), y = F1, color = comparison_preference, group = interaction(comparison_preference, abundance_ct_0))) +
   geom_boxplot() +
   facet_grid(. ~ tool) +
   theme_test()  +
@@ -504,6 +469,7 @@ ggplot(df, aes(x = factor(abundance_ct_0), y = F1, color = comparison_preference
   scale_color_discrete(name = "Cohort comparison") +
   scale_colour_brewer(palette = "Dark2") +ylim(0.2,1)
 #dev.off()
+ggsave(file = "./../../results_4ct_sym/sym_F1.svg", plot = image, width = 13, height = 5)
 
 ```
 
@@ -514,73 +480,8 @@ ggplot(df, aes(x = factor(abundance_ct_0), y = F1, color = comparison_preference
 features = result_list[seq(2, length(result_list), by = 2)]
 names(features) = unique(names(all))
 
-
-
-
-# change rownames for SEA
-for(i in grep("SEA_bi_", names(features))){
-  for (x in 1:100){
-  rownames(features[[i]][[x]]) = sub("X", "", rownames(features[[i]][[x]]))
-  rownames(features[[i]][[x]]) = sub("(.*)_(.*)", "\\2_\\1", rownames(features[[i]][[x]]))
-  match = gsub("`", "",rownames(features[[100]][[1]]))
-  vec <- features[[i]][[x]][order(match(match, gsub("`", "",rownames(features[[i]][[x]])))), ]
-  features[[i]][[x]]$Overall = vec
-  rownames(features[[i]][[x]]) <- sub("X", "",rownames(features[[100]][[1]]))
-  }
-}
-
-#for(i in grep("Misty", names(features))){
-#  for (x in 1:100){
-#  rownames(features[[i]][[x]]) = sub("juxta_", "", rownames(features[[i]][[x]]))
-#  rownames(features[[i]][[x]]) = sub("ct", "", rownames(features[[i]][[x]]))
-#  rownames(features[[i]][[x]]) = sub("ct", "", rownames(features[[i]][[x]]))
-#  rownames(features[[i]][[x]]) = sub("`", "", rownames(features[[i]][[x]]))
-#  rownames(features[[i]][[x]]) = sub("`", "", rownames(features[[i]][[x]]))
-#  rownames(features[[i]][[x]]) = sub("(.*)_(.*)", "\\2_\\1", rownames(features[[i]][[x]]))
-#  #match = gsub("`", "",rownames(features[[1]][[1]]))
-#  #vec <- features[[i]][[x]][order(match(match, gsub("`", "",rownames(features[[i]][[x]])))), ]
-#  #features[[i]][[x]]$Overall = vec
-#  #rownames(features[[i]][[x]]) <- sub("X", "",rownames(features[[100]][[1]]))
-#  }
-#}
-
-
-features_ord = list()
-# Combine the results into the stat list
-for (i in seq_along(features)) {
-  for (x in 1:100) {
-      # Order row names of dataset1 based on row names of dataset2
-      #features_ord[[i]] <- features[[i]][[x]][order(match(rownames(features[[i]][[x]]), rownames(features[[i]][[1]]))), ]
-      
-      # Order row names of dataset1 based on row names of dataset2
-      ordered_rownames <- rownames(features[[i]][[1]])
-
-      # Reorder rows of dataset1 using the ordered row names
-      features[[i]][[x]] <- features[[i]][[x]][ordered_rownames, , drop = FALSE]
-  }
-}
-
 for (i in 1:length(features)){
   features[[i]] <- do.call("cbind", features[[i]])
-}
-
-features[[1]]
-
-pheatmap(features[[14]])
-
-#reorder to ground-truth order
-vector = sub("(.*)_(.*)", "\\2_\\1", rownames(features[[1]]))
-vector = sub("`","", vector)
-vector = sub("`", "",vector)
-
-
-
-df[order(match(rownames(df), vector)), , drop = FALSE]
-
-for (i in 1:length(features)){
-  rownames(features[[i]]) = sub("`","", rownames(features[[i]]))
-  rownames(features[[i]]) = sub("`", "",rownames(features[[i]]))
-  features[[i]] <- features[[i]][order(match(rownames(features[[i]]), vector)), , drop = FALSE]
 }
 
 
@@ -594,25 +495,25 @@ Generate ground truth to measure with cosine similarity
 # these are proximity values from simulation, those should make the rank
 
 # generate vector to fill with values for symmetric dataset
-#vec = sub("X", "", rownames(features[[1]]))
-#ran = c(0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25)
-#self0_0.6 = c(0.60, 0.13, 0.13, 0.14, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.29, 0.29, 0.14, 0.29, 0.29, 0.28)
-#self0_0.45 = c(0.45, 0.18, 0.18, 0.19, 0.18, 0.27, 0.28, 0.27, 0.18, 0.28, 0.27, 0.27, 0.19, 0.27, 0.27, 0.27)
-
-# for asymmetric dataset
 vec = sub("X", "", rownames(features[[1]]))
 ran = c(0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25)
-self0_0.6 = c(0.13, 0.6, 0.13, 0.14,0.29, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.29, 0.29, 0.14, 0.29, 0.28)
-self0_0.45 = c(0.18, 0.45, 0.18, 0.19, 0.28, 0.18, 0.27, 0.27, 0.27, 0.19, 0.27, 0.27, 0.27, 0.18, 0.28, 0.27)
+self0_0.6 = c(0.60, 0.13, 0.13, 0.14, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.29, 0.29, 0.14, 0.29, 0.29, 0.28)
+self0_0.45 = c(0.45, 0.18, 0.18, 0.19, 0.18, 0.27, 0.28, 0.27, 0.18, 0.28, 0.27, 0.27, 0.19, 0.27, 0.27, 0.27)
+
+# for asymmetric dataset
+#vec = sub("X", "", rownames(features[[1]]))
+#ran = c(0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25)
+#self0_0.6 = c(0.13, 0.6, 0.13, 0.14,0.29, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.29, 0.29, 0.14, 0.29, 0.28)
+#self0_0.45 = c(0.18, 0.45, 0.18, 0.19, 0.28, 0.18, 0.27, 0.27, 0.27, 0.19, 0.27, 0.27, 0.27, 0.18, 0.28, 0.27)
 
 # for sym dataset
-#ranks = data.frame(ran_vs_self_0.6 = abs(ran - self0_0.6),
-#                   ran_vs_self_0.45 = abs(ran - self0_0.45),
-#                   self_0.45_vs_self_0.6 = abs(self0_0.6 - self0_0.45))
+ranks = data.frame(ran_vs_self_0.6 = abs(ran - self0_0.6),
+                   ran_vs_self_0.45 = abs(ran - self0_0.45),
+                   self_0.45_vs_self_0.6 = abs(self0_0.6 - self0_0.45))
 #asym
-ranks = data.frame(cross01_0.6_vs_ran = abs(ran - self0_0.6),
-                   cross01_0.45_vs_ran = abs(ran - self0_0.45),
-                   cross01_0.45_vs_cross01_0.6 = abs(self0_0.6 - self0_0.45))#
+#ranks = data.frame(cross01_0.6_vs_ran = abs(ran - self0_0.6),
+##                   cross01_0.45_vs_ran = abs(ran - self0_0.45),
+#                   cross01_0.45_vs_cross01_0.6 = abs(self0_0.6 - self0_0.45))#
 
 rownames(ranks) = vec
 
@@ -691,7 +592,7 @@ cosine_similarities = gather(cosine_similarities, value = "cosine_similarity", k
 #pdf("./../../results_4ct_sym_0.2grid_self/plots/sym_self00_cosine_similarity_counts_ct_normalized.pdf", width =17.5, height = 4.5)
 #pdf("./../../results_4ct_sym_0.2grid_self/plots/sym_self00_cosine_similarity_scaled_counting_0.6.pdf", width = 5.5, height = 4.5)
 #pdf("./../../results_4ct_asym_0.2grid_self/plots/Giotto_cosine_correct_order_asym.pdf", width = 4.2, height = 4.5)
-ggplot(cosine_similarities, aes(x = factor(abundance_ct_0), y = cosine_similarity, color = comparison, group = interaction(comparison, abundance_ct_0))) +
+image2 = ggplot(cosine_similarities, aes(x = factor(abundance_ct_0), y = cosine_similarity, color = comparison, group = interaction(comparison, abundance_ct_0))) +
   geom_boxplot() +
   facet_grid(. ~ tool) +
   theme_test() +
@@ -702,8 +603,17 @@ ggplot(cosine_similarities, aes(x = factor(abundance_ct_0), y = cosine_similarit
   scale_color_discrete(name = "Cohort comparison") +
   scale_colour_brewer(palette = "Dark2") + ylim(0.57,0.98)
 #dev.off()
+ggsave(file = "./../../results_4ct_sym/sym_cosinesim.svg", plot = image2, width = 13, height = 5)
+
   
 ```
+########################################
+From here on, it is just exploring more options for plotting interaction scores etc.
+
+
+
+
+
 
 ```{r}
 # heatmap to see feature importances?

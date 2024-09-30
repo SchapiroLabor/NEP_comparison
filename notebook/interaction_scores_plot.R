@@ -134,6 +134,11 @@ for (i in grep("0.25_self_0.45_vs_self_0.6", names)){
 }
 
 
+### check interactions score of SEA to see, if it is asymmetric
+
+
+
+
 
 
 

@@ -25,17 +25,15 @@ library(tidyverse)
 
 Load in all different result files
 ```{r}
-csv_dir = "./../../results_4ct_asym/"
-data <- list.files(path = csv_dir, recursive = FALSE, pattern = "\\.csv$")
+csv_dir = "./../../results_Risom/"
+data <- list.files(path = csv_dir, recursive = FALSE, pattern = "\\_sublineage.csv$")
 all = list()
 for (i in 1:length(data)){
-  #print(i)
   all[[i]] <- as.data.frame(read_csv(paste0(csv_dir,data[i])))
   #rownames(all[[i]]) = sub("4ct_self", "", as.vector(all[[i]][,1]))
   rownames(all[[i]]) = as.vector(all[[i]][,1])
   rownames(all[[i]]) = sub(".csv", "", rownames(all[[i]]))
   all[[i]] = all[[i]][,-1]
-  all[[i]] = all[[i]][rownames(all[[1]]), ]
 
 
 # switch interactions colnames Misty
@@ -45,169 +43,82 @@ colnames(all[[i]]) = sub("(.*)_(.*)", "\\2_\\1", colnames(all[[i]]))}
 for(i in grep("histo", data)){
   colnames(all[[i]]) = sub("(.*)_(.*)", "\\2_\\1", colnames(all[[i]]))
 }
-
-all
-
+data
 ```
 Make correct order of features and double the features for Giotto as asymmetric
 
 ```{r}
-giotto_inidces <- which(sapply(all, function(df) ncol(df) == 10))
+
+# select giotto dataframe
+giotto_inidces <- which(sapply(all, function(df) ncol(df) ==153))
 
 for (i in giotto_inidces){
-  dob = all[[i]][, !colnames(all[[i]]) %in% c("0_0", "1_1", "2_2", "3_3")]
+  dob <- all[[i]][, !sapply(colnames(all[[i]]), function(col) {
+  parts <- strsplit(col, "_")[[1]]
+  length(parts) == 2 && parts[1] == parts[2]
+})]
   colnames(dob) = sub("(.*)_(.*)", "\\2_\\1", colnames(dob))
   all[[i]] = cbind(all[[i]] , dob)
 }
 
-
-##make all datasets the same order and without any numbers in the feature names
-modify_row_names <- function(row_name) {
-  numbers <- gsub("\\D", "", row_name)
-  modified_name <- paste(strsplit(numbers, "")[[1]], collapse = "_")
-  return(modified_name)
-}
-
-for (i in 1:length(all)){
-    colnames(all[[i]]) <- as.vector(sapply(colnames(all[[i]]), modify_row_names))
-    }
-
-
 # correct order for ground truth later 
-ordered_cols <- c("0_0", "0_1", "0_2", "0_3", "1_0", "1_1", "1_2", "1_3", "2_0", "2_1", "2_2", "2_3", "3_0", "3_1", "3_2", "3_3")
-# Combine the results into the stat list
-for (i in 1:length(all)) {
+ordered_cols <- colnames(all[[2]])
+# Combine the results into the stat list, exclude basline dataset from ordering
+for (i in 1:length(all)) { 
+  if(ncol(all[[i]]) > 50)
       # Reorder rows of dataset1 using the ordered row names
       all[[i]] <- all[[i]][, ordered_cols , drop = FALSE]
-      # Drop the row where the name is 'new_column'
-      all[[i]] <- all[[i]][1:1500,]
-      all[[i]] <- all[[i]][complete.cases(all[[i]]), ]
-      all[[i]] <- all[[i]] %>% mutate_all(as.numeric)
-      all[[i]] <- all[[i]][match(rownames(all[[1]]), rownames(all[[i]])), ]
-  }
-
-#look at correct names
-for (i in 1:length(all)){
-print(colnames(all[[i]]))
-  }
-
-```
-
-print all
-```{r}
-all[[5]]
-
-
-```
-
-
-
-
-Create defining group columns within datasets
-```{r}
-df_list = list()
-
-
-for (i in 1:length(all)){
-  #all[[i]]$preference <- sub("_ab.*sim_\\d+$", "", rownames(all[[i]]))
-  #all[[i]]$preference <- sub("self_", "self0_", all[[i]]$preference)
-  all[[i]]$preference <- sub("_ab.*$", "", rownames(all[[i]]))
-  all[[i]]$preference <- sub("_ab.*$", "", all[[i]]$preference)
-  all[[i]]$abundance <- sub(".*ab", "ab", rownames(all[[i]]))
-  all[[i]]$abundance = sub("_[0-9]+$", "", all[[i]]$abundance)
-  all[[i]]$abundance = sub("_sim", "", all[[i]]$abundance)
 }
-
-
+sum(colnames(all[[2]]) %in% colnames(all[[4]]))
 ```
+
+
 
 Gereate datasets with only the two groups to compare, give it the right naming and then the rest of the script should stay the same :)
 ```{r}
-
+all[[3]]
 ```
-
+HEEEERRRRREEEEE how to compare!!!!!!!!!
  Naming convention: Tool_x_vs_y
-
-```{r}
-# prepare lists
-df_comb = list()
-split_string <- strsplit(data, "4ct")
-#toollist <- sub("_+$", "", split_string[[1]][1])
-#part_after_sim <- paste("sim", split_string[[1]][2], sep = "")
-
-# now loop through every combination of abundances are preferences to compare all tools withtin their abundances
-for (i in 1:length(all)){
-  combs <- combn(unique(all[[i]]$preference), 2)
-  pref_comb <- apply(combs, 2, function(x) c(as.character(x[1]), as.character(x[2])))
-  for (a in unique(all[[i]]$abundance)){
-  df = all[[i]] %>% filter(abundance == a)
-    for (p in 1:ncol(pref_comb)){
-      df2 = df %>% filter(preference %in% pref_comb[,p]) 
-      df_comb[[paste(sub("_+$", "", split_string[[i]][1]), unique(df2$abundance), unique(df2$preference)[1], "vs", unique(df2$preference)[2], sep = "_")]] = df2 %>% select(-preference, -abundance)
-      #df_comb[[paste(sub("_+$", "", split_string[[i]][1]), unique(df2$abundance), paste(pref_comb[,p], sep = "_vs_"), sep = "_")]] = df2
-      }
-    }
-  }
-
-# these are the comparisons we have:
-names = names(df_comb)
-
-names(df_comb)
-
-library(tidyverse)
-library(factoextra)
-library(pheatmap)
-
-all = df_comb
-
-```
-```{r}
-
-```
-
 
  
 
 Create heatmap for all to see, what to expect
 ```{r}
-str(all)
 library(tidyverse)
 library(factoextra)
 library(pheatmap)
 
+names(all) = data
+meta = read_csv("./../../../../../data/Risom_breast/Table_S1_Patient_Feature_Table.csv")
+table(meta$Status)
+status = meta$Status
+status = status[grepl("progressor", status)]
+status = data.frame(row.names = rownames(all[[1]]), status = factor(status))
 
 
 for (i in 1:length(all)){
   pheatmap(all[[i]], treeheight_row = 0, treeheight_col = 0, main = names(all)[i], cluster_rows = F)
 }
 
-#pheatmap(rbind(colMeans(all[[13]][1:100,]), colMeans(all[[i]][101:200,])), treeheight_row = 0, treeheight_col = 0, main = names(all)[i], cluster_rows = F)
-
-#generate heatmap for all
-# Misty und SEA haben noch ein self06 datenfile intus.
-
-# save one plot to show purpose
-#
-#png("./../../../../Figures/raw/Comparison/heatmap_histoCAT01.1_strongvsweak.png", height = 400, width = 550, res = 150)
-#colnames(all[[34]]) = sub("X", "", colnames(all[[3]]))
-#pheatmap(all[[34]], treeheight_row = 0, treeheight_col = 0, show_rownames = FALSE)
-#Edev.off()
-
-
-#names(all)[102]
-1
 ```
 Create PCA plot of all results
 ```{r}
+meta = read_csv("./../../../../../data/Risom_breast/Table_S1_Patient_Feature_Table.csv")
+status = meta$Status
+
+
 for (i in 1:length(all)){
 df = all[[i]]
+df = df[grep("progressor", status), ]
+status = status[grepl("progressor", status)]
 # some datasets have zero variance column (sigval in histocat). They cannot be scaled
   if(0 %in% apply(df, 2, sd)){
     pca_res <- prcomp(df)
   }else{
     pca_res <- prcomp(df, scale. = TRUE)
   }
-df$group = sub("_ab.*", "", rownames(df))
+df$group = status
 
 print(autoplot(pca_res, data = df, colour = 'group') +
       ggtitle(names(all)[i]) +
@@ -250,7 +161,20 @@ for (i in 1:length(all)){
 }
 
 ```
+Create defining group columns within datasets
 
+Now it has two columns more, point number and status of progressor/non-progressor
+```{r}
+df_list = list()
+
+for (i in 1:length(all)){
+  #all[[i]]$preference <- sub("_ab.*sim_\\d+$", "", rownames(all[[i]]))
+  #all[[i]]$preference <- sub("self_", "self0_", all[[i]]$preference)
+  all[[i]] = all[[i]][grep("progressor", status), ]
+
+}
+
+```
 
 Set functions for random forest and F1 statistics
 ```{r}
@@ -259,14 +183,14 @@ stat = list()
 library(caret)
 library(randomForest)
 # Create an index variable for the two groups
-group_index <- rep(c("A","B"), each=100)
+group_index <- status
 
 # write F1 and FDR function
 # Calculate the F1 score
 F1_Score <- function(predictions, actual) {
-  TP <- sum(predictions == "B" & actual == "B")
-  FP <- sum(predictions == "B" & actual == "A")
-  FN <- sum(predictions == "A" & actual == "B")
+  TP <- sum(predictions == "nonprogressor" & actual == "nonprogressor")
+  FP <- sum(predictions == "nonprogressor" & actual == "progressor")
+  FN <- sum(predictions == "progressor" & actual == "nonprogressor")
   precision <- TP / (TP + FP)
   recall <- TP / (TP + FN)
   F1 <- 2 * precision * recall / (precision + recall)
@@ -285,20 +209,16 @@ unregister_dopar <- function() {
   rm(list=ls(name=env), pos=env)
 }
 unregister_dopar()
-
-#all[[1]]
 ```
 
 
 Parallelize 100 iterations
 ```{r}
-
-#all[[80]]
-
 library(foreach)
 library(doParallel)
 library(caret)
 library(randomForest)
+
 
 # Set the number of cores to use
 num_cores <- 6
@@ -310,22 +230,30 @@ num_iterations <- 100
 
 # Create a list to store the results
 stat <- list()
-#i=80
+
 # Loop over the data
-foreach(i = 1:length(all), .combine = c, .packages = c("caret","randomForest")) %dopar% {
+foreach(i = 1:length(all), .combine = c, .packages = c("caret","randomForest", "tidyverse")) %dopar% {
   # Combine index variable with data
   data <- cbind(all[[i]], group_index)
+  
+  
   # Create a list to store the results for this iteration
   result <- list()
   
   for (x in 1:num_iterations){
+    #downsamle majority class for balanced dataset
+    prog = rownames(data[data$group_index == "progressor",])
+    nonprog = sample(rownames(data[data$group_index == "nonprogressor",]), min(table(status)),replace = FALSE)
+    
+    data = data[rownames(data) %in% c(prog, nonprog), ]
     # Split data into training and test sets
+    
     trainIndex <- caret::createDataPartition(data$group_index, p = 0.8, list = FALSE, times = 1)
     train <- data[trainIndex, ]
     test <- data[-trainIndex, ]
 
-    # Define the model, CURRENTLY CHANGE TO GLM
-    model <- caret::train(group_index ~ ., data = train, method = "glm", trControl = trainControl(method = "cv", number = 5))
+    # Define the model
+    model <- caret::train(group_index ~ ., data = train, method = "rf", trControl = trainControl(method = "cv", number = 5))
     
     # Make predictions on the test set
     predictions <- predict(model, newdata = test)
@@ -357,9 +285,7 @@ for (i in seq_along(F1)) {
 #result_list = readRDS("./../../results_4ct_asym_0.2grid_self/Misty_cross/Misty_F1_correct_order.rds")
 # loading results wo spatialLDA
 #all = all[c(1:length(all)) %notin% grep("SpatialLDA", names(all))]
-
 ```
-
 
 Make an F1 baseline with scrambled labels to show interpretability of results
 
@@ -419,10 +345,244 @@ stat_null <- do.call("rbind", F1_null)
 
 ```
 
+####try calculating ROC curves instead of F1 scores
+```{r}
+library(foreach)
+library(doParallel)
+library(caret)
+library(randomForest)
+library(pROC)
+library(withr)
+library(cowplot)
+library(svglite)
+
+
+# Set the number of cores to use
+num_cores <- 6
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+
+
+# Create a list to store the results
+stat <- list()
+roc_curves <- list()
+data = data <- cbind(all[[1]], group_index)
+#prog <- rownames(data[data$group_index == "progressor",])
+#nonprog <- sample(rownames(data[data$group_index == "nonprogressor",]), min(table(status)), replace = FALSE)
+#save downsampled patients
+#downsampled = cbind(prog, nonprog)
+#colnames(downsampled) = c("prog", "nonprog")
+#write.csv(downsampled, "./../../../../../data/Risom_breast/downsamples_patients.csv")
+
+# Loop over the data
+foreach(i = 1:length(all), .packages = c("caret", "randomForest", "tidyverse", "pROC", "withr")) %dopar% {
+  # Combine index variable with data
+  data <- cbind(all[[i]], group_index)
+
+    # Initialize a list to store individual ROC curves
+
+    #downsamle majority class for balanced dataset
+    
+    
+    data <- data[rownames(data) %in% c(prog, nonprog), ]
+    
+    # Split data into training and test sets
+    #trainIndex <- caret::createDataPartition(data$group_index, p = 0.8, list = FALSE, times = 1)
+    #train <- data[trainIndex, ]
+    #test <- data[-trainIndex, ]
+    
+    # Define the model
+    
+    model <- with_seed(1, caret::train(group_index ~ ., data = data, method = "glm", metric = "ROC", trControl = trainControl(method = "cv", number = 10,
+                                                                                                 classProbs = TRUE,
+                                                                                                summaryFunction = twoClassSummary,
+                                                                                                savePredictions = TRUE)))
+    
+    roc(model$pred$obs, model$pred[, 3], quiet = TRUE)
+
+    
+} -> result_list
+
+
+
+names(result_list) = names(all)
+# Extract individual ROC curves and combine them
+#all_roc_curves <- do.call(c, result_list[[3]])
+
+# Plot the average ROC curve
+#plot(do.call(c, all_roc_curves), col = "darkorange", main = "Average ROC Curve", lwd = 2, col.main = "navy")
+#plot(roc_curve, col = "darkorange", main = "Average ROC Curve", lwd = 2, col.main = "navy", xlim = c(1, 0), ylim = c(0, 1))
+# names(result_list) = sub("_sublineage.csv", "", names(all))
+# names(result_list) = sub("_delaunay", "", names(result_list))
+
+# for (i in 1:length(result_list)){
+# plot(result_list[[i]], main = names(result_list)[i])
+#}
+ 
+
+
+###################
+# Plot all ROC curves on the same graph
+# Define colors for each curve
+# Plot ROC curves using plot() function
+#png("./../../results_Risom/ROC_plot_stable.png", width = 900, height = 700, res =150)  # Specify the file name and dimensions
+
+svglite("./../../results_Risom/ROC_plot_wolegend.svg", width = 5, height = 4.5)  # Specify the file name and dimensions
+
+plot(NULL, type = "n", xlim = c(1, 0), ylim = c(0, 1), xlab = "Specificity", ylab = "Sensitivity", main = "ROC Curves tools")
+
+# Define colors for each curve
+curve_colors <- c("black", "blue", "darkgreen", "orange", "purple", "pink", "red")
+
+# Plot each ROC curve
+for (i in seq_along(result_list)) {
+  roc_curve <- result_list[[i]]
+  lines(roc_curve, col = curve_colors[i], lwd = 2)
+}
+
+names(result_list) = sub(".csv", "", names(all))
+names(result_list) = sub("_delaunay", "", names(result_list))
+
+
+# Assuming legend_names is your vector of legend names
+# Replace this with your actual vector
+legend_names <- names(result_list)
+
+# Add legend with custom names
+#legend("bottomright", legend = legend_names, col = curve_colors, lwd = 1, cex = 0.7)
+
+dev.off()
+
+```
+
+Get auc table from ROC curves
+```{r}
+library(gridSVG)
+library(grid)
+library(gridExtra)
+library(gridSVG)
+library(ggplot2)
+library(ggtext)
+
+auc = list()
+for (i in 1:length(result_list)) {
+  auc[[i]] = result_list[[i]]$auc
+}
+auc = unlist(auc)
+auc = as.data.frame.matrix(t(cbind(legend_names, auc)))
+colnames(auc) = auc[1,]
+auc = auc[-1,]
+
+write.csv(auc, "./../../results_Risom/auc.csv")
+
+```
+
+
+Can I do feature filtering before?
+
+```{r}
+####try calculating ROC curves instead of F1 scores
+
+library(foreach)
+library(doParallel)
+library(caret)
+library(randomForest)
+library(pROC)
+library(withr)
+library(cowplot)
+
+# Set the number of cores to use
+num_cores <- 6
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+importances <- list()
+# Set the number of iterations
+num_iterations <- 10
+
+# Create a list to store the results
+stat <- list()
+roc_curves <- list()
+# Loop over the data
+foreach(i = 1:length(all), .combine = c, .packages = c("caret", "randomForest", "tidyverse", "pROC")) %dopar% {
+  # Combine index variable with data
+  data <- cbind(all[[i]], group_index)
+  
+  # Create a list to store the results for this iteration
+  result <- list()
+    # Initialize a list to store individual ROC curves
+  
+
+    #downsamle majority class for balanced dataset
+    prog <- rownames(data[data$group_index == "progressor",])
+    nonprog <- sample(rownames(data[data$group_index == "nonprogressor",]), min(table(status)), replace = FALSE)
+    
+    data <- data[rownames(data) %in% c(prog, nonprog), ]
+    
+    # Split data into training and test sets
+    #trainIndex <- caret::createDataPartition(data$group_index, p = 0.8, list = FALSE, times = 1)
+    #train <- data[trainIndex, ]
+    #test <- data[-trainIndex, ]
+    
+    # Define the model
+    
+    model <- caret::train(group_index ~ ., data = data, method = "glm", metric = "ROC", trControl = trainControl(method = "cv", number = 10,
+                                                                                                 classProbs = TRUE, 
+                                                                                                summaryFunction = twoClassSummary,
+                                                                                                savePredictions = TRUE))
+    
+    roc_curve = roc(model$pred$obs, model$pred[, 3], direction = "auto",  quiet = TRUE)
+    roc_curves[[x]] <- roc_curve
+    # Make predictions on the test set
+    #predictions <- predict(model, newdata = test, type = "prob")  # Obtain class probabilities
+    names(roc_curves) = names(all)[i]
+    # Calculate ROC curve
+    #roc_curve <- roc(ifelse(test$group_index == "progressor", 1, 0), predictions[, 2], drop_intermediate = FALSE)  # Assuming "progressor" is the positive class
+    
+    
+    # Store the result for this iteration
+    #importances[[x]] <- varImp(model$finalModel)
+    #result[[x]] <- auc(roc_curve)  # Store the AUC instead of F1 score
+  
+  
+  # Combine the results for this iteration into the stat list
+  #names(importances) <- paste(i, seq_along(importances), sep = "_")
+  #names(roc_curves) <- paste(x, names(all)[i], sep = "_")
+  roc_curves
+  #list(result, importances, roc_curves)
+} -> result_list
+
+
+###################
+# Plot all ROC curves on the same graph
+# Define colors for each curve
+# Plot ROC curves using plot() function
+plot(NULL, type = "n", xlim = c(1, 0), ylim = c(0, 1), xlab = "Specificity", ylab = "Sensitivity", main = "ROC Curves tools")
+
+# Define colors for each curve
+curve_colors <- c("red", "blue", "darkgreen", "orange", "purple")
+
+# Plot each ROC curve
+for (i in seq_along(result_list)) {
+  roc_curve <- result_list[[i]]
+  lines(roc_curve, col = curve_colors[i], lwd = 2)
+}
+
+names(result_list) = sub("_sublineage.csv", "", names(all))
+names(result_list) = sub("_delaunay", "", names(result_list))
+
+
+# Assuming legend_names is your vector of legend names
+# Replace this with your actual vector
+legend_names <- names(result_list)
+
+# Add legend with custom names
+legend("bottomright", legend = legend_names, col = curve_colors, lwd = 1, cex = 0.7)
+```
+
+
 Name stats correctly
 
 ```{r}
-#all = all[-c(1:15)]
 
 df = as.data.frame.matrix(do.call("rbind", stat))
 df$tool = rep(names(all), each = 100)
@@ -443,70 +603,37 @@ Create plot to show comparison
 ```{r}
 # generate dataset
 
-split_strings <- sapply(df$Run, function(x) {
-  split_string <- strsplit(x, "[Ss]im")
-  part_before_sim <- sub("_+$", "", split_string[[1]][1])
-  part_after_sim <- paste("sim", split_string[[1]][2], sep = "")
-  return(list(part_before_sim, part_after_sim))
-})
-# Get the parts before and after "sim"
-df$comparison <- sub(".*_ab", "ab", df$Run)
-# this is the comaprison without abundance: df$comparison <- sub(".*_ab._[0-9]\\.[0-9]*_", "", names(all)), just took me long and I did not want to delete it
-df$tool <- sub("_ab.*", "", df$Run)
+df$Run <- sub("_sublineage.csv", "", df$Run)
+df$Run <- sub("_delaunay", "", df$Run)
+df <- na.omit(df)
 
 ```
 
 # color abundances
 
-```{r, fig.height=12, fig.width=12}
-df$abundance = sub("^(.+?)_[^_]+_(.*)", "\\1", df$comparison)
-  
-```
-
 Create boxplot as Denis wanted it
-```{r, fig.width=20, fig.height = 5}
-# exclude sigval value in histocat
+```{r, fig.width=6, fig.height = 4}
 
-df$abundance = sub("^(.+?)_[^_]+_(.*)", "\\1", df$comparison)
-# separate the comparison column into two columns using separate() function
-df$comparison_preference = sub("^[^_]*_[^_]*_", "", df$comparison)
-#df_sort <- df[order(df$abundance, df$tool),]
-#df_sort$abundance_ct_0 = sub("^ab0_", "", df_sort$abundance)
-df$abundance_ct_0 = sub("^ab0_", "", df$abundance)
-df$comparison_preference = as.factor(df$comparison_preference)
-
-df$tool = sub("SEA_bi_100iter_direction_delaunay", "SEA_bi_direction_delaunay", df$tool)
-df$tool = sub("IMCR_histoCAT_delaunay_p_lt", "IMCR_histoCAT_delaunay", df$tool)
-
-df$comparison = sub("ran_vs_self", "", "")
-df$tool = sub("10motifs", "k9_10motifs", df$tool)
-
-# shortly subset:
-#df = df %>% filter(tool != "Giotto_delaunay")
-#pdf("./../../results_4ct_sym_0.2grid_self/plots/sym_self00_comparison_abundance_boxplots_with_SpatialLDA.pdf", width = 24, height = 4.5)
-#pdf("./../../results_4ct_asym_0.2grid_self/plots/Giotto_F1_correct_order_asym.pdf", width = 4.5, height = 4.5)
-image = ggplot(df, aes(x = factor(abundance_ct_0), y = F1, color = comparison_preference, group = interaction(comparison_preference, abundance_ct_0))) +
+unique(df$Run)
+image = ggplot(df, aes(x = factor(Run), y = F1)) +
   geom_boxplot() +
-  facet_grid(. ~ tool) +
+  geom_jitter(color="black", size=0.5, alpha=0.9) +
   theme_test()  +
   theme(axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5, hjust = 1)) +
-  xlab("Abundance ct 0") +
+  xlab("Tool") +
   ylab("F1 score (random forest)") +
-  scale_x_discrete(labels=c('0.12 - 0.18', '0.15 - 0.20', '0.17 - 0.22', '0.22 - 0.23', '0.25')) +
+  #scale_x_discrete(labels=c('0.12 - 0.18', '0.15 - 0.20', '0.17 - 0.22', '0.22 - 0.23', '0.25')) +
   scale_color_discrete(name = "Cohort comparison") +
   scale_colour_brewer(palette = "Dark2") +ylim(0.2,1)
 #dev.off()
-#ggsave(file = "./../../results_4ct_asym/asym_F1_SEAfixed.svg", plot = image, width = 16, height = 5)
-image
+#ggsave(file = "./../../results_Risom/F1_scores_celllineage.svg", plot = image, width = 3, height = 5.5)
+
 ```
 
 
 ### Continue with feature importances
 
-```{r}
-#result_list[[2]]
-#all = all[-(1:15)]
-
+```{r, fig.width=8, fig.height = 7}
 features = result_list[seq(2, length(result_list), by = 2)]
 names(features) = unique(names(all))
 
@@ -514,10 +641,41 @@ for (i in 1:length(features)){
   features[[i]] <- do.call("cbind", features[[i]])
 }
 
-features[[2]]
+feat_mean = list()
+for (i in 1:length(features)){
+  feat_mean[[i]] <- rowMeans(features[[i]])
+  
+}
+names(features) = sub("_sublineage.csv", "", names(features))
+names(features) = sub("_delaunay", "", names(features))
+names(feat_mean) = names(features)
+feat_cos = do.call("rbind", feat_mean)
+pheatmap(feat_cos)
+
+library(Radviz)
+# Calculate cosine similarity matrix
+mat <- t(feat_cos)
+sim.mat <- cosine(mat)
+ncol(mat)
+dim(sim.mat)
+
+
+
+
+pheatmap(sim.mat)
+ggsave(file = "./../../results_Risom/cosinesim_scores_sublineage.svg", plot = pheatmap(sim.mat), width = 5.5, height = 5)
+
+
 ```
 
+Look at feature means
+```{r}
+feat_means = do.call("rbind", feat_mean)
+pheatmap(feat_means)
 
+ggsave(file = "./../../results_Risom/featureimp_sublineage.svg", plot = pheatmap(feat_means), width = 18, height = 4.5)
+
+```
 
 
 Generate ground truth to measure with cosine similarity
@@ -530,10 +688,8 @@ Generate ground truth to measure with cosine similarity
 #self0_0.6 = c(0.60, 0.13, 0.13, 0.14, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.29, 0.29, 0.14, 0.29, 0.29, 0.28)
 #self0_0.45 = c(0.45, 0.18, 0.18, 0.19, 0.18, 0.27, 0.28, 0.27, 0.18, 0.28, 0.27, 0.27, 0.19, 0.27, 0.27, 0.27)
 
-
-# "0_0" "0_1" "0_2" "0_3" "1_0" "1_1" "1_2" "1_3" "2_0" "2_1" "2_2" "2_3" "3_0" "3_1" "3_2" "3_3"
 # for asymmetric dataset
-vec = sub("X", "", rownames(features[[80]]))
+vec = sub("X", "", rownames(features[[1]]))
 ran = c(0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25)
 self0_0.6 = c(0.13, 0.6, 0.13, 0.14,0.29, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.29, 0.29, 0.14, 0.29, 0.28)
 self0_0.45 = c(0.18, 0.45, 0.18, 0.19, 0.28, 0.18, 0.27, 0.27, 0.27, 0.19, 0.27, 0.27, 0.27, 0.18, 0.28, 0.27)
@@ -635,201 +791,10 @@ image2 = ggplot(cosine_similarities, aes(x = factor(abundance_ct_0), y = cosine_
   scale_color_discrete(name = "Cohort comparison") +
   scale_colour_brewer(palette = "Dark2") + ylim(0.57,0.98)
 #dev.off()
-#ggsave(file = "./../../results_4ct_asym/asym_cosinesim_SEAfixed.svg", plot = image2, width = 16, height = 5)
+ggsave(file = "./../../results_4ct_asym/asym_cosinesim_SEAfixed.svg", plot = image2, width = 16, height = 5)
 
 image2
 ```
-########################################
-From here on, it is just exploring more options for plotting interaction scores etc.
-
-```{r}
-# heatmap to see feature importances?
-
-try = features[[grep("SpatialLDA_knn9_10motifs_ab0_0.25_ran_vs_self_0.6", names(features))]]
-#rownames(try) = sub("(.*)_(.*)", "\\2_\\1", rownames(try))
-try1 = as.data.frame.matrix(t(try)) %>% colMeans()
-try2 = as.data.frame.matrix(t(try)) %>% colMeans()
-try3 = as.data.frame.matrix(t(try)) %>% colMeans()
-try4 = as.data.frame.matrix(t(try)) %>% colMeans()
-try5 = as.data.frame.matrix(t(try)) %>% colMeans()
-try6 = as.data.frame.matrix(t(try)) %>% colMeans()
-try7 = as.data.frame.matrix(t(try)) %>% colMeans()
-try8 = as.data.frame.matrix(t(try)) %>% colMeans()
-try9 = as.data.frame.matrix(t(try)) %>% colMeans()
-try10 = as.data.frame.matrix(t(try)) %>% colMeans()
-try11 = as.data.frame.matrix(t(try)) %>% colMeans()
-try12 = as.data.frame.matrix(t(try)) %>% colMeans()
-try13 = as.data.frame.matrix(t(try)) %>% colMeans()
-try14 = as.data.frame.matrix(t(try)) %>% colMeans()
-try15 = as.data.frame.matrix(t(try)) %>% colMeans()
-
-try = t(scale(t(rbind(try1, try2, try3, try4, try5, try6, try7, try8, try9, try10, try11, try12, try13, try14, try15, ranks$self_0.45_vs_self_0.6))))
-try = t(scale(t(rbind(try1, try2, try3, try4, try5, ranks$cross01_0.6_vs_ran))))
-try = t(scale(t(rbind(try1, try2, try3, try4, try5))))
-try = t(scale(t(rbind(try1, try2, try3, try4, try5, ranks$ran_vs_self_0.45, try6, try7, try8, try9, try10, ranks$self_0.45_vs_self_0.6))))
-rownames(try) = c('Misty_ran_vs_0.45_ab0.05', 'Misty_ran_vs_0.45_ab_0.1', 'Misty_ran_vs_0.45_ab_0.15', 'Misty_ran_vs_0.45_ab_0.2', 'Misty_ran_vs_0.45_ab_0.25', "ground_truth_ran_vs_0.45", 
-                  'Misty_0.45_vs_0.6_ab0.05', 'Misty_0.45_vs_0.6_ab_0.1', 'Misty_0.45_vs_0.6_ab_0.15', 'Misty_0.45_vs_0.6_ab_0.2', 'Misty_0.45_vs_0.6_ab_0.25',  "ground_truth_0.45_vs_0.6")
-
-
-rownames(try) = c('0.12 - 0.18', '0.15 - 0.20', '0.17 - 0.22', '0.22 - 0.23', '0.25', "ground_truth_0.6_vs_ran")
-rownames(try) = c('0.12 - 0.18', '0.15 - 0.20', '0.17 - 0.22', '0.22 - 0.23', '0.25')
-
-rownames(try) = c('IMCRclassic_0.05', 'IMCRclassic_0.1', 'IMCRclassic_0.15', 'IMCRclassic_0.2', 'IMCRclassic_0.25', 
-                  'histoCAT_0.05','histoCAT_0.1', 'histoCAT_0.15','histoCAT_0.2', 'histoCAT_0.25', 
-                  'SEAbi_0.05', 'SEAbi_0.1', 'SEAbi_0.15', 'SEAbi_0.2', 'SEAbi_0.25', "ground_truth")
-
-pheatmap(try, treeheight_row = 0, treeheight_col = 0, cluster_rows = F)
-
-# scaled to 1
-#png("./../../../../Figures/raw/Comparison/heatmap_count50_increase_ABUNDANCES_OVERVIEW.png", height = 400, width = 550, res = 150)
-png("./../../../../Figures/raw/images/heatmap_spatialLDA_featureimp_sym_ranvs06.png", height = 300, width = 750, res = 150)
-colnames(try) = sub("`", "", colnames(try))
-colnames(try) = sub("`", "", colnames(try))
-#pheatmap(t(scale(try)), treeheight_row = 0, treeheight_col = 0, show_rownames = FALSE, cluster_rows = F)
-pheatmap(try, treeheight_row = 0, treeheight_col = 0, cluster_rows = F)
-dev.off()
-
-
-pheatmap(t(ranks))
-```
-
-Just visualize it first, maybe the means
-
-```{r}
-
-# Calculate row means for each dataframe in the list
-row_means <- lapply(features, function(df) rowMeans(df, na.rm = TRUE))
-names(row_means) = unique(names)
-
-
-# Group vectors by length
-grouped_list <- split(row_means, lengths(row_means))
-
-# Rbind vectors with the same length
-combined_vectors <- lapply(grouped_list, function(x) do.call(rbind, x))
-
-# Print the combined vectors
-for (i in seq_along(combined_vectors)) {
-  cat("Combined vectors with length", names(combined_vectors)[i], ":\n")
-  print(combined_vectors[[i]])
-}
-
-
-
-ranks_16 = do.call("rbind", grouped_list[[2]])
-1
-```
-
-
-calculate cosine similarity for ranks with binary count
-```{r}
-library(proxy)
-try = ranks_16[grep(colnames(ranks[1]), rownames(ranks_16), value = TRUE), ]
-
-
-### manual
-
-given_vector = as.vector(ranks$cross01_06_vs_ran)
-# Calculate cosine similarity between rows and the given vector
-row_cosine_sim <- apply(try, 1, function(row) {
-  dot_product <- sum(row * given_vector)
-  magnitude_row <- sqrt(sum(row^2))
-  magnitude_given <- sqrt(sum(given_vector^2))
-  dot_product / (magnitude_row * magnitude_given)
-})
-```
-
-Try to visualize
-```{r}
-class(row_cosine_sim)
-
-res_cos = as.data.frame.matrix(cbind(as.numeric(row_cosine_sim), sub("_ab0.*$", "", names(row_cosine_sim))))
-rownames(res_cos) = names(row_cosine_sim)
-colnames(res_cos) = c("cosine_similarity", "method")
-res_cos$cosine_similarity = as.numeric(res_cos$cosine_similarity)
-
-ggplot(res_cos, aes(method, cosine_similarity)) +
-  geom_boxplot() +
-  theme_test() +
-  theme(axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5, hjust = 1)) 
-```
-#####
-
-Now with the ones that have length 10
-
-```{r}
-# these are proximity values from simulation, those should make the rank
-
-# generate vector to fill with values for symmetric dataset
-#vec = sub("X", "", rownames(features[[80]]))
-#ran = c(0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25)
-#self0_0.6 = c(0.60, 0.13, 0.13, 0.14, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.29, 0.29, 0.14, 0.29, 0.29, 0.28)
-#self0_0.45 = c(0.45, 0.18, 0.18, 0.19, 0.18, 0.295, 0.295, 0.21, 0.18, 0.295, 0.295, 0.21, 0.19, 0.21, 0.21, 0.37)
-
-# for asymmetric dataset
-vec = sub("X", "", rownames(features[[80]]))
-ran = c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
-self0_0.6 = c(0.13, 0.6, 0.13, 0.14,0.29, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.299, 0.29, 0.14, 0.29, 0.28)
-self0_0.45 = c(0.18, 0.45, 0.18, 0.19, 0.28, 0.18, 0.27, 0.27, 0.27, 0.19, 0.27, 0.27, 0.27, 0.18, 0.28, 0.27)
-
-# for sym dataset
-#ranks = data.frame(ran_vs_self0_0.6 = abs(ran - self0_0.6),
-#                   ran_vs_self0_0.45 = abs(ran - self0_0.45),
-#                   self0_0.45_vs_self0_0.6 = abs(self0_0.6 - self0_0.45))
-
-ranks = data.frame(cross01_06_vs_ran = abs(ran - self0_0.6),
-                   cross01_045_vs_ran = abs(ran - self0_0.45),
-                   cross01_045_vs_cross01_06 = abs(self0_0.6 - self0_0.45))
-
-rownames(ranks) = vec
-ranks
-```
-
-
-Just visualize it first, maybe the means
-
-```{r}
-
-ranks_10 = do.call("rbind", grouped_list[[1]])
-
-```
-
-calculate cosine similarity for ranks with binary count
-```{r}
-library(proxy)
-try = ranks_10[grep(colnames(ranks[1]), rownames(ranks_16), value = TRUE), ]
-
-
-### manual
-
-given_vector = as.vector(ranks$cross01_06_vs_ran)
-# Calculate cosine similarity between rows and the given vector
-row_cosine_sim <- apply(try, 1, function(row) {
-  dot_product <- sum(row * given_vector)
-  magnitude_row <- sqrt(sum(row^2))
-  magnitude_given <- sqrt(sum(given_vector^2))
-  dot_product / (magnitude_row * magnitude_given)
-})
-```
-
-Try to visualize
-```{r}
-class(row_cosine_sim)
-
-res_cos = as.data.frame.matrix(cbind(as.numeric(row_cosine_sim), sub("_ab0.*$", "", names(row_cosine_sim))))
-rownames(res_cos) = names(row_cosine_sim)
-colnames(res_cos) = c("cosine_similarity", "method")
-res_cos$cosine_similarity = as.numeric(res_cos$cosine_similarity)
-
-ggplot(res_cos, aes(method, cosine_similarity)) +
-  geom_boxplot() +
-  theme_test() +
-  theme(axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5, hjust = 1)) 
-```
-
-
-
-
 
 
 

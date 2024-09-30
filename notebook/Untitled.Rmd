@@ -9,34 +9,21 @@ output: html_document
 ## Compare all tools, results saved in folder 2 up
 
 ```{r}
-
-# Install packages
-library(FactoMineR)
-library(ggcorrplot)
-library(corrr)
-library(readr)
-library(ggfortify)
-library(ggplot2)
-library(randomForestSRC)
-library(caret)
-library(tidyverse)
-
+source("utils.R")
+# define folder where all files from simulated cohorts are stored
+csv_dir = "./../../results_4ct_asym/"
 ```
 
-Load in all different result files
+Load in all different result files and ensure correct ordering of the interaction direction
 ```{r}
-csv_dir = "./../../results_4ct_asym/"
 data <- list.files(path = csv_dir, recursive = FALSE, pattern = "\\.csv$")
+
 all = list()
 for (i in 1:length(data)){
-  #print(i)
   all[[i]] <- as.data.frame(read_csv(paste0(csv_dir,data[i])))
-  #rownames(all[[i]]) = sub("4ct_self", "", as.vector(all[[i]][,1]))
   rownames(all[[i]]) = as.vector(all[[i]][,1])
   rownames(all[[i]]) = sub(".csv", "", rownames(all[[i]]))
   all[[i]] = all[[i]][,-1]
-  all[[i]] = all[[i]][rownames(all[[1]]), ]
-
 
 # switch interactions colnames Misty
 colnames(all[[i]]) = sub("(.*)_(.*)", "\\2_\\1", colnames(all[[i]]))}
@@ -45,8 +32,6 @@ colnames(all[[i]]) = sub("(.*)_(.*)", "\\2_\\1", colnames(all[[i]]))}
 for(i in grep("histo", data)){
   colnames(all[[i]]) = sub("(.*)_(.*)", "\\2_\\1", colnames(all[[i]]))
 }
-
-all
 
 ```
 Make correct order of features and double the features for Giotto as asymmetric
@@ -61,52 +46,24 @@ for (i in giotto_inidces){
 }
 
 
-##make all datasets the same order and without any numbers in the feature names
-modify_row_names <- function(row_name) {
-  numbers <- gsub("\\D", "", row_name)
-  modified_name <- paste(strsplit(numbers, "")[[1]], collapse = "_")
-  return(modified_name)
-}
-
+#make all datasets the same order and without any numbers in the feature names
 for (i in 1:length(all)){
     colnames(all[[i]]) <- as.vector(sapply(colnames(all[[i]]), modify_row_names))
     }
 
-
-# correct order for ground truth later 
+# order columns the same way for all datasets
 ordered_cols <- c("0_0", "0_1", "0_2", "0_3", "1_0", "1_1", "1_2", "1_3", "2_0", "2_1", "2_2", "2_3", "3_0", "3_1", "3_2", "3_3")
-# Combine the results into the stat list
 for (i in 1:length(all)) {
       # Reorder rows of dataset1 using the ordered row names
       all[[i]] <- all[[i]][, ordered_cols , drop = FALSE]
-      # Drop the row where the name is 'new_column'
-      all[[i]] <- all[[i]][1:1500,]
-      all[[i]] <- all[[i]][complete.cases(all[[i]]), ]
-      all[[i]] <- all[[i]] %>% mutate_all(as.numeric)
-      all[[i]] <- all[[i]][match(rownames(all[[1]]), rownames(all[[i]])), ]
-  }
-
-#look at correct names
-for (i in 1:length(all)){
-print(colnames(all[[i]]))
-  }
-
-```
-
-print all
-```{r}
-all[[5]]
+}
 
 
 ```
 
-
-
-
-Create defining group columns within datasets
+Create defining group columns within datasets for binary classification
 ```{r}
 df_list = list()
-
 
 for (i in 1:length(all)){
   #all[[i]]$preference <- sub("_ab.*sim_\\d+$", "", rownames(all[[i]]))
@@ -116,26 +73,20 @@ for (i in 1:length(all)){
   all[[i]]$abundance <- sub(".*ab", "ab", rownames(all[[i]]))
   all[[i]]$abundance = sub("_[0-9]+$", "", all[[i]]$abundance)
   all[[i]]$abundance = sub("_sim", "", all[[i]]$abundance)
+  
+  #all[[i]] = as.numeric(all[[i]])
 }
 
 
 ```
 
-Gereate datasets with only the two groups to compare, give it the right naming and then the rest of the script should stay the same :)
-```{r}
-
-```
-
- Naming convention: Tool_x_vs_y
-
+Naming convention for every comparison: Tool_x_vs_y
 ```{r}
 # prepare lists
 df_comb = list()
 split_string <- strsplit(data, "4ct")
-#toollist <- sub("_+$", "", split_string[[1]][1])
-#part_after_sim <- paste("sim", split_string[[1]][2], sep = "")
 
-# now loop through every combination of abundances are preferences to compare all tools withtin their abundances
+# now loop through every combination of abundances and preferences to compare all tools withtin their abundances
 for (i in 1:length(all)){
   combs <- combn(unique(all[[i]]$preference), 2)
   pref_comb <- apply(combs, 2, function(x) c(as.character(x[1]), as.character(x[2])))
@@ -149,58 +100,29 @@ for (i in 1:length(all)){
     }
   }
 
-# these are the comparisons we have:
+# save comparisons in datalist
 names = names(df_comb)
-
-names(df_comb)
-
-library(tidyverse)
-library(factoextra)
-library(pheatmap)
-
 all = df_comb
 
 ```
-```{r}
-
-```
 
 
- 
+
 
 Create heatmap for all to see, what to expect
 ```{r}
-str(all)
-library(tidyverse)
-library(factoextra)
-library(pheatmap)
-
-
 
 for (i in 1:length(all)){
   pheatmap(all[[i]], treeheight_row = 0, treeheight_col = 0, main = names(all)[i], cluster_rows = F)
 }
 
-#pheatmap(rbind(colMeans(all[[13]][1:100,]), colMeans(all[[i]][101:200,])), treeheight_row = 0, treeheight_col = 0, main = names(all)[i], cluster_rows = F)
-
-#generate heatmap for all
-# Misty und SEA haben noch ein self06 datenfile intus.
-
-# save one plot to show purpose
-#
-#png("./../../../../Figures/raw/Comparison/heatmap_histoCAT01.1_strongvsweak.png", height = 400, width = 550, res = 150)
-#colnames(all[[34]]) = sub("X", "", colnames(all[[3]]))
-#pheatmap(all[[34]], treeheight_row = 0, treeheight_col = 0, show_rownames = FALSE)
-#Edev.off()
-
-
-#names(all)[102]
-1
 ```
+
 Create PCA plot of all results
 ```{r}
 for (i in 1:length(all)){
 df = all[[i]]
+
 # some datasets have zero variance column (sigval in histocat). They cannot be scaled
   if(0 %in% apply(df, 2, sd)){
     pca_res <- prcomp(df)
@@ -214,26 +136,12 @@ print(autoplot(pca_res, data = df, colour = 'group') +
         theme_bw()
       )
 }
-
-# save one plot to show purpose
-
-
-#df = all[[143]]
-#pca_res <- prcomp(df, scale. = TRUE)
-#df$group = sub("_ab.*", "", rownames(df))###
-
-#png("./../../../../Figures/raw/Comparison/PCA_SEA_example.png", height = 400, width = 600, res = 150)
-#autoplot(pca_res, data = df, colour = 'group') +
-#      ggtitle(names(all)[143]) +
-#        theme_bw()
-#dev.off()
-
 ```
-Create comparison of interactino score distributions
+
+Create comparison of interaction score distributions
 ```{r}
 # select column of interest (specific cell cell interaction)
 COI = 2
-
 
 for (i in 1:length(all)){
   groups = rep(unlist(strsplit(names(all[i]), "_vs_")), each = 100)
@@ -248,9 +156,7 @@ for (i in 1:length(all)){
   )
   
 }
-
 ```
-
 
 Set functions for random forest and F1 statistics
 ```{r}
@@ -285,16 +191,12 @@ unregister_dopar <- function() {
   rm(list=ls(name=env), pos=env)
 }
 unregister_dopar()
-
-#all[[1]]
 ```
 
 
 Parallelize 100 iterations
 ```{r}
-
-#all[[80]]
-
+all[[1]]
 library(foreach)
 library(doParallel)
 library(caret)
@@ -310,7 +212,7 @@ num_iterations <- 100
 
 # Create a list to store the results
 stat <- list()
-#i=80
+
 # Loop over the data
 foreach(i = 1:length(all), .combine = c, .packages = c("caret","randomForest")) %dopar% {
   # Combine index variable with data
@@ -419,10 +321,10 @@ stat_null <- do.call("rbind", F1_null)
 
 ```
 
+
 Name stats correctly
 
 ```{r}
-#all = all[-c(1:15)]
 
 df = as.data.frame.matrix(do.call("rbind", stat))
 df$tool = rep(names(all), each = 100)
@@ -435,6 +337,9 @@ length(names(all))
 #colnames(base) = c("F1", "FDR", "Run")
 # bind baseline and toolresults together
 #df = rbind(df, base)
+# save df
+# Assuming your dataframe is named df_all_avg_clean
+write.csv(df, "./../../RF_comparison_sym.csv", row.names = FALSE)
 
 ```
 
@@ -497,24 +402,115 @@ image = ggplot(df, aes(x = factor(abundance_ct_0), y = F1, color = comparison_pr
   scale_colour_brewer(palette = "Dark2") +ylim(0.2,1)
 #dev.off()
 #ggsave(file = "./../../results_4ct_asym/asym_F1_SEAfixed.svg", plot = image, width = 16, height = 5)
-image
+
+```
+Make heatmap out of that
+```{r, fig.height=6}
+
+# Step 1: Calculate mean and standard deviation of F1 for each combination of tool and comparison_preference
+df_summary <- df %>%
+  group_by(tool, comparison_preference) %>%
+  summarise(mean_F1 = mean(F1), sd_F1 = sd(F1)) %>%
+  ungroup()
+
+# Step 2: Create the dot plot with dot size representing SD and color representing mean F1
+dot_plot <- ggplot(df_summary, aes(x = tool, y = comparison_preference)) +
+  geom_point(aes(size = sd_F1, color = mean_F1)) +  # Dot size for SD and color for mean F1
+  scale_size_continuous(name = "Standard Deviation (SD)") +  # Size scale for SD
+  scale_color_gradient(low = "blue", high = "red", name = "Mean F1 Score") +  # Color scale for mean F1 score
+  theme_minimal() +  # Clean theme
+  labs(x = "Tool", y = "Comparison Preference") +  # Label the axes
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for readability
+
+# Step 3: Display the plot
+dot_plot
+```
+Onlyt take tools of interest and rename
+```{r}
+df_avg_clean = df_summary %>%
+  mutate(tool = recode(tool,
+                       "Giotto_delaunay" = "Giotto",
+                       "IMCR_histoCAT_delaunay" = "histoCAT",
+                       "Misty_juxta30_delaunay" = "Misty",
+                       "SEA_bi_100iter_zscore_delaunay" = "SEA"
+                       )) %>%
+  mutate(comparison_preference = recode(comparison_preference,
+                       "ran_vs_self_0.6" = "random vs strong interaction 0-0",
+                       "self_0.45_vs_self_0.6" = "weak vs strong interaction 0-0",
+                       "ran_vs_self_0.45" = "random vs weak interactino 0-0",
+                       )) %>%
+  filter(tool %in% c("Giotto", "histoCAT", "Misty", "SEA"))
+
+
+# Step 2: Create the dot plot with dot size representing SD and color representing mean F1
+dot_plot <- ggplot(df_avg_clean, aes(x = tool, y = comparison_preference)) +
+  geom_point(aes(size = sd_F1, color = mean_F1)) +  # Dot size for SD and color for mean F1
+  scale_size_continuous(name = "Standard Deviation (SD)") +  # Size scale for SD
+  scale_color_gradient(low = "blue", high = "red", name = "Mean F1 Score") +  # Color scale for mean F1 score
+  theme_minimal() +  # Clean theme
+  labs(x = "Tool", y = "Comparison Preference") +  # Label the axes
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for readability
+
+# Step 3: Display the plot
+dot_plot
+
+```
+Boxplot
+```{r, fig.width = 6}
+df_all_avg_clean = df %>%
+  mutate(tool = recode(tool,
+                       "Giotto_delaunay" = "Giotto",
+                       "IMCR_histoCAT_delaunay" = "histoCAT",
+                       "Misty_juxta30_delaunay" = "Misty",
+                       "SEA_bi_100iter_zscore_delaunay" = "SEA"
+                       )) %>%
+  mutate(comparison_preference = recode(comparison_preference,
+                       "ran_vs_self_0.6" = "random vs strong",
+                       "self_0.45_vs_self_0.6" = "weak vs strong",
+                       "ran_vs_self_0.45" = "random vs weak",
+                       )) %>%
+  filter(tool %in% c("Giotto", "histoCAT", "Misty", "SEA"))
+
+# Updated plot for publication
+image2 <- ggplot(df_all_avg_clean, aes(x = tool, y = F1)) +
+  geom_boxplot(aes(fill = tool), color = "black", outlier.size = 1, outlier.shape = 16) +  # Black outline for boxplot and smaller outliers
+  facet_grid(. ~ comparison_preference) +  # Facet by comparison_preference
+  theme_bw(base_size = 14) +  # Cleaner, more minimalist theme with larger base font
+  theme(
+    axis.text.x = element_text(size = 12, angle = 45, vjust = 1, hjust = 1),  # Tilt x-axis labels for readability
+    axis.text.y = element_text(size = 12),  # Increase size of y-axis text
+    strip.text = element_text(size = 14, face = "bold"),  # Make facet labels larger and bold
+    legend.position = "none",  # Remove legend if not needed (or adjust)
+    #panel.grid.major = element_blank(),  # Remove major gridlines for clarity
+    #panel.grid.minor = element_blank()   # Remove minor gridlines
+  ) +
+  labs(
+    #title = "Comparison of F1 Scores Across Methods",  # Add title
+    x = "Method",  # X-axis label
+    y = "F1 Score",  # Y-axis label
+    #caption = "Each box represents the distribution of F1 scores by method and comparison preference."  # Optional caption
+  ) +
+  scale_fill_brewer(palette = "Dark2") +  # Use a colorblind-friendly palette
+  coord_cartesian(ylim = c(0.2, 1))  # Set limits for y-axis to improve visibility
+
+# Plot
+image2
+unique(df$tool)
+#ggsave("./../../../../Paper_figures/dirSEA_v2/RF_comparison_symmetric_core_tools.svg", plot = image2, device = "svg", width = 6, height = 4)
 ```
 
 
 ### Continue with feature importances
 
 ```{r}
-#result_list[[2]]
-#all = all[-(1:15)]
-
+#importances[1]
 features = result_list[seq(2, length(result_list), by = 2)]
 names(features) = unique(names(all))
 
 for (i in 1:length(features)){
   features[[i]] <- do.call("cbind", features[[i]])
 }
-
-features[[2]]
+features[[1]]
 ```
 
 
@@ -530,10 +526,8 @@ Generate ground truth to measure with cosine similarity
 #self0_0.6 = c(0.60, 0.13, 0.13, 0.14, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.29, 0.29, 0.14, 0.29, 0.29, 0.28)
 #self0_0.45 = c(0.45, 0.18, 0.18, 0.19, 0.18, 0.27, 0.28, 0.27, 0.18, 0.28, 0.27, 0.27, 0.19, 0.27, 0.27, 0.27)
 
-
-# "0_0" "0_1" "0_2" "0_3" "1_0" "1_1" "1_2" "1_3" "2_0" "2_1" "2_2" "2_3" "3_0" "3_1" "3_2" "3_3"
 # for asymmetric dataset
-vec = sub("X", "", rownames(features[[80]]))
+vec = sub("X", "", rownames(features[[40]]))
 ran = c(0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25)
 self0_0.6 = c(0.13, 0.6, 0.13, 0.14,0.29, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.29, 0.29, 0.14, 0.29, 0.28)
 self0_0.45 = c(0.18, 0.45, 0.18, 0.19, 0.28, 0.18, 0.27, 0.27, 0.27, 0.19, 0.27, 0.27, 0.27, 0.18, 0.28, 0.27)
@@ -547,10 +541,39 @@ ranks = data.frame(cross01_0.6_vs_ran = abs(ran - self0_0.6),
                    cross01_0.45_vs_ran = abs(ran - self0_0.45),
                    cross01_0.45_vs_cross01_0.6 = abs(self0_0.6 - self0_0.45))#
 
-rownames(ranks) = vec
+rownames(ranks) = c("0_0", "0_1", "0_2", "0_3", "1_0", "1_1", "1_2", "1_3", "2_0", "2_1", "2_2", "2_3", "3_0", "3_1", "3_2", "3_3")
 
 ```
 Calcuate 100 cosine simuílarities for each tool for each comparison
+
+expand feature list for giotto
+```{r}
+giotto_inidces <- which(sapply(features, function(df) nrow(df) == 10))
+
+for (i in giotto_inidces){
+  df = t(features[[i]])
+  dob = df[, !colnames(df) %in% c("`\\`0_0\\``", "`\\`1_1\\``", "`\\`2_2\\``", "`\\`3_3\\``")]
+  #print(dob)
+  colnames(dob) = sub("(.*)_(.*)", "\\2_\\1", colnames(dob))
+  df2 = t(cbind(df, dob))
+  rownames(df2) = gsub("[`\\\\]", "", rownames(df2))
+  features[[i]] = df2
+}
+
+# order columns the same way for all datasets
+ordered_cols <- c("0_0", "0_1", "0_2", "0_3", "1_0", "1_1", "1_2", "1_3", "2_0", "2_1", "2_2", "2_3", "3_0", "3_1", "3_2", "3_3")
+for (i in giotto_inidces) {
+      # Reorder rows of dataset1 using the ordered row names
+      features[[i]] <- features[[i]][ordered_cols, , drop = FALSE]
+}
+
+for (i in 1:length(features)){
+  rownames(features[[i]]) = ordered_cols
+}
+
+features[[1]]
+```
+
 
 ```{r}
 # only for dataframes with length 16: 
@@ -639,6 +662,54 @@ image2 = ggplot(cosine_similarities, aes(x = factor(abundance_ct_0), y = cosine_
 
 image2
 ```
+Make a boxplot out of it
+```{r}
+df_cosine_avg_clean = cosine_similarities %>%
+  mutate(tool = recode(tool,
+                       "Giotto_delaunay" = "Giotto",
+                       "IMCR_histoCAT_delaunay" = "histoCAT",
+                       "Misty_juxta30_delaunay" = "Misty",
+                       "SEA_bi_zscorefixed_delaunay" = "SEA",
+                       "SEA_100iter_zscorefixed_direction_delaunay" = "dirSEA"
+                       )) %>%
+  mutate(comparison = recode(comparison,
+                       "cross01_0.6_vs_ran" = "random vs strong",
+                       "cross01_0.45_vs_cross01_0.6" = "weak vs strong",
+                       "cross01_0.45_vs_ran" = "random vs weak",
+                       )) %>%
+  filter(tool %in% c("Giotto", "histoCAT", "Misty", "SEA", "dirSEA"))
+
+# Updated plot for publication
+image2 <- ggplot(df_cosine_avg_clean, aes(x = tool, y = cosine_similarity)) +
+  geom_boxplot(aes(fill = tool), color = "black", outlier.size = 1, outlier.shape = 16) +  # Black outline for boxplot and smaller outliers
+  facet_grid(. ~ comparison) +  # Facet by comparison_preference
+  theme_bw(base_size = 14) +  # Cleaner, more minimalist theme with larger base font
+  theme(
+    axis.text.x = element_text(size = 12, angle = 45, vjust = 1, hjust = 1),  # Tilt x-axis labels for readability
+    axis.text.y = element_text(size = 12),  # Increase size of y-axis text
+    strip.text = element_text(size = 14, face = "bold"),  # Make facet labels larger and bold
+    legend.position = "none",  # Remove legend if not needed (or adjust)
+    #panel.grid.major = element_blank(),  # Remove major gridlines for clarity
+    #panel.grid.minor = element_blank()   # Remove minor gridlines
+  ) +
+  labs(
+    #title = "Comparison of F1 Scores Across Methods",  # Add title
+    x = "Method",  # X-axis label
+    y = "F1 Score",  # Y-axis label
+    #caption = "Each box represents the distribution of F1 scores by method and comparison preference."  # Optional caption
+  ) +
+  scale_fill_brewer(palette = "Dark2") +  # Use a colorblind-friendly palette
+  coord_cartesian(ylim = c(0.2, 1))  # Set limits for y-axis to improve visibility
+
+# Plot
+image2
+unique(cosine_similarities$tool)
+unique(df_cosine_avg_clean$tool)
+```
+
+
+
+
 ########################################
 From here on, it is just exploring more options for plotting interaction scores etc.
 

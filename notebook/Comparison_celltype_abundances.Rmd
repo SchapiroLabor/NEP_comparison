@@ -30,8 +30,8 @@ cl <- makeCluster(num.cores)
 registerDoParallel(cl)
 
 # define function to read csv files and extract x, y, and ct columns
-files = list.files("./../../../../data/Sim_nbh15_asym01_1000_grid0.2_1kiter_025kswap/", pattern = ".csv")
-data_path = "./../../../../data/Sim_nbh15_asym01_1000_grid0.2_1kiter_025kswap/"
+files = list.files("./../../../../data/Sim_nbh15_sym00_1000_grid0.2_1kiter_025kswap/", pattern = ".csv")
+data_path = "./../../../../data/Sim_nbh15_sym00_1000_grid0.2_1kiter_025kswap/"
 ```
 
 Load and format data
@@ -47,6 +47,9 @@ stopCluster(cl)
 
 abundances = as.data.frame.matrix(abundances)
 rownames(abundances) = files
+
+#save the abundance files for running
+write.csv(abundances, "./../../results_4ct_sym/ct_abundances_delaunay_4ct_self00.csv", row.names = TRUE)
 
 ```
 

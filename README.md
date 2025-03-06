@@ -10,13 +10,22 @@ We systematically compared the NEP methods Giotto, IMCRtools (classic and histoC
 ![Overview Figure 1](images/fig1_overview.png)
 
 ### Structure
-notebooks: 
+
+
+
+#### notebooks: 
 - IST_data_comparison
     - NEP_symmetric_IST_comparison.Rmd: Loads all NEP result files of the symmetric IST cohorts, performs cohort classification and contains all code to reproduce the Figures in the Schiller et al. (2025) manuscript. 
     - NEP_asymmetric_IST_comparison.Rmd: Loads all NEP result files of the asymmetric IST cohorts, performs cohort classification and contains all code to reproduce the Figures in the Schiller et al. (2025) manuscript. 
     
 - MI_data_comparison
     - NEP_MI_heart_comparison.Rmd: Loads all NEP result files of the MI dataset, explores the raw NEP scores of NEPs of interest and contains all code to reproduce the Figures in the Schiller et al. (2025) manuscript. 
+    
+#### scripts:
+- interaction_scores_plot.R: Creates figures for raw NEP score comparison of the symmetric cohort (Figure 2c in manuscript).
+
+#### images:
+- fig1_overview.png: Overview image Figure 1. 
 
 ### How to run
 Please clone this github repository. Input data for simulation and MI data NEP result analysis are .csv files of NEP results generated in these github repositories:

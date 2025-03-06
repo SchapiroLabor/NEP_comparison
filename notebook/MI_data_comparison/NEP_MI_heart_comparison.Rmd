@@ -1,0 +1,567 @@
+---
+title: "MI_comparison"
+output: html_notebook
+---
+```{r}
+library(readr)
+library(ggplot2)
+library(pheatmap)
+library(tidyverse)
+library(pheatmap)
+library(gridExtra)
+
+```
+
+read the datasets
+```{r}
+
+csv_dir = "./../../../Comparison/20250218_results_MI/"
+#csv_dir = "./../../../../../MI_heart_paper/2024_results_MI/"
+
+data <- list.files(path = csv_dir, recursive = FALSE, pattern = "\\.csv$")
+all = list()
+for (i in 1:length(data)){
+  all[[i]] <- as.data.frame(read_csv(paste0(csv_dir,data[i])))
+  #rownames(all[[i]]) = sub("4ct_self", "", as.vector(all[[i]][,1]))
+  rownames(all[[i]]) = as.vector(all[[i]][,1])
+  rownames(all[[i]]) = sub(".csv", "", rownames(all[[i]]))
+  all[[i]] = all[[i]][,-1]}
+
+names(all) = data
+```
+Make colnames similar between all tools
+```{r}
+i=1
+for (i in 1:length(all)){
+  colnames(all[[i]]) = gsub("\\.\\.1", "neg", colnames(all[[i]]))
+  colnames(all[[i]]) = gsub("2_", "2neg_", colnames(all[[i]]))
+  colnames(all[[i]]) = gsub("2\\.", "2pos", colnames(all[[i]]))
+  colnames(all[[i]]) = gsub("1\\.", "1pos", colnames(all[[i]]))
+  colnames(all[[i]]) = gsub("\\.", "", colnames(all[[i]]))
+  colnames(all[[i]]) = gsub(" ", "", colnames(all[[i]]))
+  colnames(all[[i]]) = gsub("/", "", colnames(all[[i]]))
+  colnames(all[[i]]) = gsub("\\+", "pos", colnames(all[[i]]))
+  colnames(all[[i]]) = gsub("-", "neg", colnames(all[[i]]))
+  colnames(all[[i]]) = gsub("final_cell_type_", "", colnames(all[[i]]))
+  colnames(all[[i]]) = gsub("importances_", "", colnames(all[[i]]))
+}
+names(all)
+
+```
+
+
+
+Bind the datasets together
+```{r, fig.height = 6, fig.width = 12}
+
+
+# Create a list to store the heatmaps
+heatmaps <- list()
+
+#names(all) = c("absolute_counts", "dirSEA_scimap", "SEA_inhouse", "SEA_scimap", "histoCAT_p_lt", "IMCR_p_lt", "dirSEA_inhouse","Misyty_knn8", "Misyty_para550","scimap_classic", "squidpy")
+#names(all) = c("histoCAT", "interaction_counts", "dirSEA_scimap","SEA" ,"Misty_knn5", "squidpy")
+names(all) = c("cond. z-score","Squidpy count" ,"Squidpy z-score")
+order_rownames = c("Control_13", "Control_12", "Control_14", "4h_97", "4h_96", "24h_83", "24h_86", "48h_79", "48h_76")
+update_rownames = c("control.r1", "control.r2", "control.r3","4h.r1", "4h.r2", "24h.r1", "24h.r2", "28h.r1", "48h.r2")
+
+
+# Loop through each dataset in 'all' and generate heatmaps
+for (i in 1:length(all)) {
+
+  if (ncol(all[[i]]) > 70) {  
+    # Select the required columns
+    #data <- all[[i]] %>% select(Neutrophils_CardiomyocytesAnkrd1pos, CardiomyocytesAnkrd1pos_Neutrophils)
+    data <- all[[i]] %>% select(Endocardialcells_MonoMacrosCcr2pos, 
+                                 MonoMacrosCcr2pos_Endocardialcells,
+                                 Endocardialcells_Neutrophils,
+                                 Neutrophils_Endocardialcells)
+    #data <- all[[i]] %>% select( MonoMacrosCcr2pos_CardiomyocytesAnkrd1pos,
+    #                             CardiomyocytesAnkrd1pos_MonoMacrosCcr2pos, 
+    #                             Neutrophils_CardiomyocytesAnkrd1pos,
+    #                             CardiomyocytesAnkrd1pos_Neutrophils
+    #                             )
+    #data <- all[[i]] %>% select(Endothelialcells_MonoMacrosCcr2pos, 
+    #                         MonoMacrosCcr2pos_Endothelialcells,
+    #                         Endothelialcells_Neutrophils,
+    #                         Neutrophils_Endothelialcells)
+    data <- data[order_rownames, ]
+    # rename rownames
+    rownames(data) = update_rownames
+    # Replace infinite and NA values with 0
+    data[is.infinite(as.matrix(data))] <- 0
+    data[is.na(as.matrix(data))] <- 0
+    
+    if(i != 0){
+      rg <- max(abs(as.matrix(data)))
+    
+    # Generate heatmap and add it to the list
+      heatmaps[[i]] <- pheatmap(t(as.matrix(data)), 
+                        na_col = "grey",  # NA values colored grey
+                        main = names(all)[i],
+                        breaks = seq(-rg, rg, length.out = 100),
+                        treeheight_row = 0, treeheight_col = 0,
+                        cluster_rows = F, cluster_cols = F,
+                        silent = TRUE,
+                        gaps_row = 2) 
+    }else{
+      
+      min_val <- 0       # Start of the heatmap scale
+      max_val <- max(as.matrix(data), na.rm = TRUE)  # Maximum value in the data
+      n_breaks <- 100    # Number of breaks for the color scale
+      breaks <- seq(min_val, max_val, length.out = n_breaks)
+      
+      # Generate the heatmap with modified breaks
+      heatmaps[[i]] <- pheatmap(t(as.matrix(data)), 
+                                na_col = "grey",  # NA values colored grey
+                                main = names(all)[i],
+                                breaks = breaks,  # Set custom breaks
+                                treeheight_row = 0, treeheight_col = 0,
+                                cluster_rows = FALSE, cluster_cols = FALSE,
+                                silent = TRUE,
+                                gaps_row = 2)
+    }
+     # Silent so we don't display immediately
+  }
+  }
+
+
+# Filter out NULL values in case not all heatmaps were created
+heatmaps <- Filter(Negate(is.null), heatmaps)
+
+# Arrange the heatmaps in a grid layout
+grid.arrange(grobs = lapply(heatmaps, function(x) x$gtable), ncol = 2)  # Adjust ncol/nrow based on need
+
+# Open an SVG device
+#svg("./../../../../Paper_figures/condzscore_v3/APPENDIX_MIdata_MonoNeutro_Ankrd+.svg", width = 12, height = 5)  # Adjust width and height as needed
+
+grid.arrange(grobs = lapply(heatmaps, function(x) x$gtable), ncol = 2) 
+
+dev.off()
+
+```
+
+Arrange dirSEA for several interactions
+```{r, fig.height = 2.5, fig.width = 7}
+dirSEA_df = all[[1]]
+
+data <- dirSEA_df %>% select(MonoMacrosCcr2pos_Endocardialcells,
+                             Endocardialcells_MonoMacrosCcr2pos, 
+                             Neutrophils_Endocardialcells,
+                             Endocardialcells_Neutrophils
+                             )
+
+data <- data[order_rownames, ]
+# Replace infinite and NA values with 0
+data[is.infinite(as.matrix(data))] <- 0
+data[is.na(as.matrix(data))] <- 0
+
+rg <- max(abs(as.matrix(data)))
+
+# Generate heatmap and add it to the list
+?pheatmap(t(as.matrix(data)), 
+          na_col = "grey",  # NA values colored grey
+          #main = "dirSEA_immune_cells_endocard", 
+          breaks = seq(-rg, rg, length.out = 100),
+          treeheight_row = 0, treeheight_col = 0,
+          cluster_rows = F, cluster_cols = F,
+          gaps_row = 2, ,
+          legend_cex = 0.5) 
+
+#pheatmap(t(as.matrix(data)))
+```
+
+```{r, fig.height = 2.5, fig.width = 7}
+dirSEA_df = all[[1]]
+
+data <- dirSEA_df %>% select(Endocardialcells_MonoMacrosCcr2pos, 
+                             MonoMacrosCcr2pos_Endocardialcells,
+                             Endocardialcells_Neutrophils,
+                             Neutrophils_Endocardialcells)
+
+data <- data[order_rownames, ]
+# Replace infinite and NA values with 0
+data[is.infinite(as.matrix(data))] <- 0
+data[is.na(as.matrix(data))] <- 0
+
+
+rg <- max(abs(as.matrix(data)))
+
+# Generate heatmap and add it to the list
+plot = pheatmap(t(as.matrix(data)), 
+          na_col = "grey",  # NA values colored grey
+          #main = "dirSEA_immune_cells_endocard", 
+          breaks = seq(-rg, rg, length.out = 100),
+          treeheight_row = 0, treeheight_col = 0,
+          cluster_rows = F, cluster_cols = F,
+          gaps_row = 2) 
+
+plot
+# Open an SVG device
+svg("./../../../../Paper_figures/dirSEA_v2/MIdata_interaction_count_endocard_monomacro.svg", width = 5, height = 2)  # Adjust width and height as needed
+
+plot
+
+dev.off()
+```
+
+
+```{r, fig.height = 2.5, fig.width = 7}
+dirSEA_df = all[[1]]
+
+data <- dirSEA_df %>% select(CardiomyocytesAnkrd1pos_MonoMacrosCcr2pos, 
+                             MonoMacrosCcr2pos_CardiomyocytesAnkrd1pos,
+                             CardiomyocytesAnkrd1pos_Neutrophils,
+                             Neutrophils_CardiomyocytesAnkrd1pos)
+
+data <- data[order_rownames, ]
+# Replace infinite and NA values with 0
+data[is.infinite(as.matrix(data))] <- 0
+data[is.na(as.matrix(data))] <- 0
+
+# Create a gradient from your desired colors
+rg <- max(abs(as.matrix(data)))
+
+# Generate heatmap and add it to the list
+plot = pheatmap(t(as.matrix(data)), 
+          na_col = "grey",  # NA values colored grey
+          breaks = seq(-rg, rg, length.out = 100),
+          #main = "dirSEA_immune_cells_endocard", 
+          treeheight_row = 0, treeheight_col = 0,
+          cluster_rows = F, cluster_cols = F,
+          gaps_row = 2) 
+
+plot
+# Open an SVG device
+svg("./../../../../Paper_figures/dirSEA_v2/MIdata_interaction_count_ankrdposCM_neutro_monomacro.svg", width = 5.5, height = 2)  # Adjust width and height as needed
+
+plot
+
+dev.off()
+
+```
+
+
+```{r, fig.height = 2.5, fig.width = 7}
+dirSEA_df = all[[2]]
+
+data <- dirSEA_df %>% select(Smoothmusclecells_MonoMacrosCcr2pos, 
+                             MonoMacrosCcr2pos_Smoothmusclecells,
+                             Smoothmusclecells_Neutrophils,
+                             Neutrophils_Smoothmusclecells)
+
+data <- data[order_rownames, ]
+# Replace infinite and NA values with 0
+data[is.infinite(as.matrix(data))] <- 0
+data[is.na(as.matrix(data))] <- 0
+
+# Create a gradient from your desired colors
+rg <- max(abs(as.matrix(data)))
+
+# Generate heatmap and add it to the list
+plot = pheatmap(t(as.matrix(data)), 
+          na_col = "grey",  # NA values colored grey
+          breaks = seq(-rg, rg, length.out = 100),
+          #main = "dirSEA_immune_cells_endocard", 
+          treeheight_row = 0, treeheight_col = 0,
+          cluster_rows = F, cluster_cols = F,
+          gaps_row = 2) 
+
+plot
+# Open an SVG device
+#svg("./../../../../Paper_figures/dirSEA_v2/MIdata_interaction_count_ankrdposCM_neutro_monomacro.svg", width = 5.5, height = 2)  # Adjust width and height as needed
+
+#plot
+
+#dev.off()
+
+```
+
+```{r, fig.height = 2.5, fig.width = 7}
+dirSEA_df = all[[2]]
+
+data <- dirSEA_df %>% select(Endothelialcells_MonoMacrosCcr2pos, 
+                             MonoMacrosCcr2pos_Endothelialcells,
+                             Endothelialcells_Neutrophils,
+                             Neutrophils_Endothelialcells)
+
+data <- data[order_rownames, ]
+# Replace infinite and NA values with 0
+data[is.infinite(as.matrix(data))] <- 0
+data[is.na(as.matrix(data))] <- 0
+
+# Create a gradient from your desired colors
+rg <- max(abs(as.matrix(data)))
+
+# Generate heatmap and add it to the list
+plot = pheatmap(t(as.matrix(data)), 
+          na_col = "grey",  # NA values colored grey
+          breaks = seq(-rg, rg, length.out = 100),
+          #main = "dirSEA_immune_cells_endocard", 
+          treeheight_row = 0, treeheight_col = 0,
+          cluster_rows = F, cluster_cols = F,
+          gaps_row = 2) 
+
+plot
+# Open an SVG device
+svg("./../../../../Paper_figures/dirSEA_v2/APPENDIX_dirSEA_MIdata_interaction_epithelial_neutro_monomacro.svg", width = 5.5, height = 2)  # Adjust width and height as needed
+
+plot
+
+#dev.off()
+```
+
+
+
+
+```{r, fig.height = 2, fig.width = 7}
+dirSEA_df = all[[2]]
+
+data <- dirSEA_df %>% select(CardiomyocytesAnkrd1pos_Cardiomyocytes, 
+                             Cardiomyocytes_CardiomyocytesAnkrd1pos)
+
+data <- data[order_rownames, ]
+# Replace infinite and NA values with 0
+data[is.infinite(as.matrix(data))] <- 0
+data[is.na(as.matrix(data))] <- 0
+
+# Generate heatmap and add it to the list
+pheatmap(t(as.matrix(data)), 
+          na_col = "grey",  # NA values colored grey
+          #main = "dirSEA_immune_cells_endocard", 
+          treeheight_row = 0, treeheight_col = 0,
+          cluster_rows = F, cluster_cols = F,
+          gaps_row = 2) 
+```
+
+```{r}
+# filter files to include
+
+names(all) = c("interaction counts", "dirSEA", "SEA", "histoCAT", "IMCR", "Misty", "Misyty_para550", "scimap", "squidpy")
+tools_to_include = c("interaction counts", "dirSEA", "SEA", "histoCAT", "Misty", "scimap", "squidpy")
+```
+
+
+Nicer plot
+```{r, fig.height = 6, fig.width=6}
+library(pheatmap)
+library(gridExtra)
+
+
+# List to store the heatmaps
+heatmaps <- list()
+
+# Loop through each dataset in 'all' and generate heatmaps
+for (i in 1:length(all)) {
+ if (names(all)[i] %in% tools_to_include){
+  if (ncol(all[[i]]) > 70) {  
+    # Select the required columns
+    data <- all[[i]] %>% select(Endocardialcells_MonoMacrosCcr2pos, MonoMacrosCcr2pos_Endocardialcells)
+    data <- data[order_rownames, ]  # Reorder rows based on your criteria
+
+    # Replace infinite and NA values with 0
+    data[is.infinite(as.matrix(data))] <- 0
+    data[is.na(as.matrix(data))] <- 0
+    
+    # Generate heatmap
+    if (i == length(all)) {
+      # Add column annotations only for the last heatmap
+      heatmaps[[i]] <- pheatmap(t(as.matrix(data)), 
+                                na_col = "grey",  
+                                main = names(all)[i], 
+                                treeheight_row = 0, treeheight_col = 0,
+                                cluster_rows = FALSE, cluster_cols = FALSE,
+                                silent = TRUE)  # Column annotations for the last plot
+    } else {
+      # No column annotations for other heatmaps
+      #if(i < 5) {}
+      if (names(all)[i] == "histoCAT_p_lt") {
+      heatmaps[[i]] <- pheatmap(t(as.matrix(data)), 
+                                na_col = "grey",  
+                                main = names(all)[i], 
+                                treeheight_row = 0, treeheight_col = 0,
+                                cluster_rows = FALSE, cluster_cols = FALSE,
+                                annotation_col = NA,  # No column annotations
+                                silent = TRUE,
+                                show_colnames = FALSE,
+                                breaks = seq(0, max(data), length.out = 100))  
+      }else{
+        heatmaps[[i]] <- pheatmap(t(as.matrix(data)), 
+                                na_col = "grey",  
+                                main = names(all)[i], 
+                                treeheight_row = 0, treeheight_col = 0,
+                                cluster_rows = FALSE, cluster_cols = FALSE,
+                                annotation_col = NA,  # No column annotations
+                                silent = TRUE,
+                                show_colnames = FALSE)  
+      }
+    }
+  }
+}}
+
+# Filter out NULL values in case not all heatmaps were created
+heatmaps <- Filter(Negate(is.null), heatmaps)
+
+# Create a list of grobs (graphics objects) for the heatmaps
+heatmap_grobs <- lapply(heatmaps, function(x) x$gtable)
+
+# Determine heights: regular for all but the last, and more for the last
+heights <- rep(1, length(heatmap_grobs))  # Start with equal heights
+heights[length(heatmap_grobs)] <- 1.8        # Make the last one taller for column annotations
+
+# Open an SVG device
+svg("./../../../../Paper_figures/dirSEA_v2/MIdata_coloc_values_methods.svg", width = 5, height = 7)  # Adjust width and height as needed
+
+# Arrange heatmaps vertically with adjusted heights
+grid.arrange(grobs = heatmap_grobs, ncol = 1, heights = heights) 
+
+
+dev.off()
+```
+
+
+Now Neutrophils and Ankrdpos cells
+
+```{r, fig.height = 6, fig.width=6}
+
+# List to store the heatmaps
+heatmaps <- list()
+
+# Loop through each dataset in 'all' and generate heatmaps
+for (i in 1:length(all)) {
+ if (names(all)[i] %in% tools_to_include){
+  if (ncol(all[[i]]) > 70) {  
+    # Select the required columns
+    data <- all[[i]] %>% select(CardiomyocytesAnkrd1pos_Neutrophils, Neutrophils_CardiomyocytesAnkrd1pos)
+    data <- data[order_rownames, ]  # Reorder rows based on your criteria
+
+    # Replace infinite and NA values with 0
+    data[is.infinite(as.matrix(data))] <- 0
+    data[is.na(as.matrix(data))] <- 0
+    
+    # Generate heatmap
+    if (i == length(all)) {
+      # Add column annotations only for the last heatmap
+      heatmaps[[i]] <- pheatmap(t(as.matrix(data)), 
+                                na_col = "grey",  
+                                main = names(all)[i], 
+                                treeheight_row = 0, treeheight_col = 0,
+                                cluster_rows = FALSE, cluster_cols = FALSE,
+                                silent = TRUE)  # Column annotations for the last plot
+    } else {
+      # No column annotations for other heatmaps
+      #if(i < 5) {}
+      if (names(all)[i] == "histoCAT_p_lt") {
+      heatmaps[[i]] <- pheatmap(t(as.matrix(data)), 
+                                na_col = "grey",  
+                                main = names(all)[i], 
+                                treeheight_row = 0, treeheight_col = 0,
+                                cluster_rows = FALSE, cluster_cols = FALSE,
+                                annotation_col = NA,  # No column annotations
+                                silent = TRUE,
+                                show_colnames = FALSE,
+                                breaks = seq(0, max(data), length.out = 100))  
+      }else{
+        heatmaps[[i]] <- pheatmap(t(as.matrix(data)), 
+                                na_col = "grey",  
+                                main = names(all)[i], 
+                                treeheight_row = 0, treeheight_col = 0,
+                                cluster_rows = FALSE, cluster_cols = FALSE,
+                                annotation_col = NA,  # No column annotations
+                                silent = TRUE,
+                                show_colnames = FALSE)  
+      }
+    }
+  }
+}}
+
+# Filter out NULL values in case not all heatmaps were created
+heatmaps <- Filter(Negate(is.null), heatmaps)
+
+# Create a list of grobs (graphics objects) for the heatmaps
+heatmap_grobs <- lapply(heatmaps, function(x) x$gtable)
+
+# Determine heights: regular for all but the last, and more for the last
+heights <- rep(1, length(heatmap_grobs))  # Start with equal heights
+heights[length(heatmap_grobs)] <- 1.8        # Make the last one taller for column annotations
+
+# Open an SVG device
+svg("./../../../../Paper_figures/dirSEA_v2/MIdata_coloc_methods_neutrophils.svg", width = 5, height = 7)  # Adjust width and height as needed
+
+# Arrange heatmaps vertically with adjusted heights
+grid.arrange(grobs = heatmap_grobs, ncol = 1, heights = heights) 
+
+
+dev.off()
+```
+
+
+
+```{r, fig.height = 8}
+heatmaps <- list()
+# Loop through each dataset in 'all' and generate heatmaps
+for (i in 1:length(all)) {
+  if(names(all)[i] %in% include_tools){
+  if (ncol(all[[i]]) > 70) {  
+    # Select the required columns
+    #data <- all[[i]] %>% select(Neutrophils_CardiomyocytesAnkrd1pos, CardiomyocytesAnkrd1pos_Neutrophils)
+    data = all[[i]] %>% select(CardiomyocytesAnkrd1pos_Neutrophils, Neutrophils_CardiomyocytesAnkrd1pos)
+    data <- data[order_rownames, ]
+    # Replace infinite and NA values with 0
+    data[is.infinite(as.matrix(data))] <- 0
+    data[is.na(as.matrix(data))] <- 0
+    
+    # Generate heatmap and add it to the list
+    heatmaps[[i]] <- pheatmap(t(as.matrix(data)), 
+                              na_col = "grey",  # NA values colored grey
+                              main = names(all)[i], 
+                              treeheight_row = 0, treeheight_col = 0,
+                              cluster_rows = F, cluster_cols = F,
+                              silent = TRUE)  # Silent so we don't display immediately
+  }
+  }
+}
+
+# Filter out NULL values in case not all heatmaps were created
+heatmaps <- Filter(Negate(is.null), heatmaps)
+
+# Arrange the heatmaps in a grid layout
+grid.arrange(grobs = lapply(heatmaps, function(x) x$gtable), ncol = 2)  # Adjust ncol/nrow based on need
+
+```
+
+```{r, fig.height = 8}
+heatmaps <- list()
+# Loop through each dataset in 'all' and generate heatmaps
+for (i in 1:length(all)) {
+  if(names(all)[i] %in% include_tools){
+  if (ncol(all[[i]]) > 70) {  
+    # Select the required columns
+    #data <- all[[i]] %>% select(Neutrophils_CardiomyocytesAnkrd1pos, CardiomyocytesAnkrd1pos_Neutrophils)
+    data = all[[i]] %>% select(Endocardialcells_Neutrophils, Neutrophils_Endocardialcells)
+    data <- data[order_rownames, ]
+    # Replace infinite and NA values with 0
+    data[is.infinite(as.matrix(data))] <- 0
+    data[is.na(as.matrix(data))] <- 0
+    
+    # Generate heatmap and add it to the list
+    heatmaps[[i]] <- pheatmap(t(as.matrix(data)), 
+                              na_col = "grey",  # NA values colored grey
+                              main = names(all)[i], 
+                              treeheight_row = 0, treeheight_col = 0,
+                              cluster_rows = F, cluster_cols = F,
+                              silent = TRUE)  # Silent so we don't display immediately
+  }
+  }
+}
+
+# Filter out NULL values in case not all heatmaps were created
+heatmaps <- Filter(Negate(is.null), heatmaps)
+
+# Arrange the heatmaps in a grid layout
+grid.arrange(grobs = lapply(heatmaps, function(x) x$gtable), ncol = 2)  # Adjust ncol/nrow based on need
+colnames(all[[1]])
+```
+
+
+
+

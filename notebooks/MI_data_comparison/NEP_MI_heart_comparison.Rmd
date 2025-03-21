@@ -16,9 +16,9 @@ read the datasets
 csv_dir = "./../../../../Comparison/20250218_results_MI/"
 
 # output_paths
-output_path_NEP_immune_Endocardial_Fig4d_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Fig4d_MI_data_heatmaps.svg"
-output_path_NEP_immune_Ankrd1_Fig4c_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Fig4c_MI_NEP_immune_Ankrd1_heatmaps.svg"
-output_path_NEP_immune_Endothelial_appendix_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Appendix_Fig_MI_NEP_immune_Endothelial_heatmaps.svg"
+output_path_NEP_immune_Endocardial_Fig4d_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Fig4d_MI_data_heatmaps_final.svg"
+output_path_NEP_immune_Ankrd1_Fig4c_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Fig4c_MI_NEP_immune_Ankrd1_heatmaps_final.svg"
+output_path_NEP_immune_Endothelial_appendix_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Appendix_Fig_MI_NEP_immune_Endothelial_heatmaps_final.svg"
 ```
 
 
@@ -36,7 +36,7 @@ names(all) = data
 ```
 Make colnames similar between all tools
 ```{r}
-i=1
+
 for (i in 1:length(all)){
   colnames(all[[i]]) = gsub("\\.\\.1", "neg", colnames(all[[i]]))
   colnames(all[[i]]) = gsub("2_", "2neg_", colnames(all[[i]]))
@@ -53,24 +53,31 @@ for (i in 1:length(all)){
 names(all)
 
 ```
-Method renames
+Method and sample renames
 ```{r}
 method_renames <- c(
+  "cellcharter_not_only_inter_knn5_try.csv" = "Cellcharter",
+  "cellcharter_only_inter_knn5_try.csv" = "Cellcharter*",
   "MI_cond_zscore_scimap_knn5.csv" = "COZI",
-  "IMCRclassic_p_lt_knn5.csv" = "IMCRtools Classic",
-  "histoCAT_p_lt_knn5.csv" = "histoCAT",
+  "classic_sigval_knn5.csv" = "IMCRtools classic",
+  "histoCAT_sigval_knn5.csv" = "histoCAT",
   "MI_Misty_knn5.csv" = "Misty",
   "MI_scimap_knn5.csv" = "Scimap",
   "MI_SEA_scimap_knn5.csv" = "SEA",
-  "squidpy_count_delaunay_4ct_cross01.csv" = "Interaction count",
-  "squidpy_zscore_delaunay_4ct_cross01.csv" = "Squidpy"
+  "squidpy_count_knn5_delaunay.csv" = "Interaction count",
+  "squidpy_zscore_knn5_delaunay.csv" = "Squidpy"
 )
+
+order_rownames = c("Control_13", "Control_12", "Control_14", "4h_97", "4h_96", "24h_83", "24h_86", "48h_79", "48h_76")
+update_rownames = c("control.r1", "control.r2", "control.r3", "sample_4h.r1", "sample_4h.r2", "sample_1d.r1", "sample_1d.r2", " sample_2d.r1", "sample_2d.r2")
+
+
 ```
 
 
 
 Restructure data
-```{r, fig.height = 6, fig.width = 12}
+```{r, fig.height = 13, fig.width = 12}
 plot_heatmaps <- function(all, selected_columns, new_column_names, method_renames, order_rownames, update_rownames, save_path = NULL) {
   heatmaps <- list()
 
@@ -135,7 +142,7 @@ plot_heatmaps <- function(all, selected_columns, new_column_names, method_rename
 
   # Save if path is provided
   if (!is.null(save_path)) {
-    svg(save_path, width = 9, height = 8)
+    svg(save_path, width = 9, height = 11)
     grid.arrange(grobs = lapply(heatmaps, function(x) x$gtable), ncol = 2)
     dev.off()
   }
@@ -179,21 +186,25 @@ plot_heatmaps(all,
               method_renames,
               order_rownames, 
               update_rownames, 
-              save_path = output_path_NEP_immune_Endocardial_Fig4d_heatmaps)
+              save_path = output_path_NEP_immune_Endocardial_Fig4d_heatmaps
+              )
 plot_heatmaps(all, NEP_immune_Ankrd1, 
               new_column_names_NEP_immune_Ankrd1, 
               method_renames,
               order_rownames, 
               update_rownames, 
-              save_path = output_path_NEP_immune_Ankrd1_Fig4c_heatmaps)
+              save_path = output_path_NEP_immune_Ankrd1_Fig4c_heatmaps
+              )
 plot_heatmaps(all, 
               NEP_immune_Endothelial, 
               new_column_names_NEP_immune_Endothelial, 
               method_renames,
               order_rownames, 
               update_rownames, 
-              save_path = output_path_NEP_immune_Endothelial_appendix_heatmaps)
+              save_path = output_path_NEP_immune_Endothelial_appendix_heatmaps
+              )
 ```
+
 
 ```{r}
 sessionInfo()

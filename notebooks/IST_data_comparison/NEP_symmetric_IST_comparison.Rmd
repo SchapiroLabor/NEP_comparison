@@ -31,11 +31,12 @@ library(doRNG)
 Paths to data and plots to be saved
 ```{r}
 #Path to folder containing all NEP pair x sample .csv files of the NEP methods to compare
-csv_dir = "./../../20250218_results_sym/"
+csv_dir = "./../../../20250218_results_sym/"
 
 #plot paths
-output_path_Fig2d_boxplots_sym = "./../../../../Paper_figures/condzscore_v3/sym_F1_detailed_2rows.svg"
-output_path_Fig2b_summary_boxplots_sym = "./../../../../Paper_figures/condzscore_v3/sym_comparison_F1_summary_alltools.svg"
+output_path_Fig2d_boxplots_sym = "./../../../../../Paper_figures/condzscore_v3/sym_F1_detailed_2rows_wcellcharter_baseline.svg"
+output_path_Fig2b_summary_boxplots_sym = "./../../../../../Paper_figures/condzscore_v3/sym_comparison_F1_summary_alltools_wcellcharter_baseline.svg"
+output_path_appendix_Fig5_heatmap = "./../../../../../Paper_figures/condzscore_v3/appendix_sym_feature_imp_heatmap_wcellcharter_baseline.svg"
 
 # Set seed for reproducibility
 set.seed(123)
@@ -56,6 +57,7 @@ for (i in 1:length(data)){
   colnames(all[[i]]) = gsub("\\.0", "", colnames(all[[i]]))
   colnames(all[[i]]) = gsub("X", "", colnames(all[[i]]))
 }
+all[[2]]
 
 ```
 
@@ -117,6 +119,8 @@ for (i in 1:length(all)){
   all[[i]]$abundance = sub("_sim", "", all[[i]]$abundance)
   all[[i]] <- all[[i]][order(rownames(all[[i]])), ]
 }
+
+all[[2]]
 ```
 
 
@@ -197,6 +201,9 @@ foreach(i = 1:length(all), .combine = c, .packages = c("caret","randomForest")) 
   
   for (x in 1:num_iterations){
     set.seed(42 + x)
+    ##########################################
+    #data$group_index = sample(data$group_index)
+    ##########################################
     # Split data into training and test sets
     trainIndex <- caret::createDataPartition(data$group_index, p = 0.8, list = FALSE, times = 1)
     train <- data[trainIndex, ]
@@ -275,6 +282,7 @@ mutate(tool = recode(tool,
                      "cond_zscore_scimap_delaunay" = "COZI",
                      "squidpy_zscore_delaunay" = "Squidpy",
                      "scimap_delaunay" = "scimap",
+                     "cellcharter_enrichment_delaunay" = "Cellcharter",
                      "SEA_zscore_scimap_delaunay" = "SEA"
                      )) %>%
   mutate(comparison_preference = recode(comparison_preference,
@@ -287,14 +295,14 @@ mutate(tool = recode(tool,
                         ))
 
 # Define your custom order
-custom_tool_order <- c("Cell type", "Interactions", "Giotto", "scimap", "IMCR classic", "histoCAT", "SEA", "Squidpy", "COZI", "Misty")
+custom_tool_order <- c("Cell type", "Interactions", "Giotto", "scimap", "IMCR classic", "histoCAT", "SEA", "Squidpy", "Cellcharter", "COZI", "Misty")
 
 df_all_avg_clean$tool <- factor(df_all_avg_clean$tool, levels = custom_tool_order)
 
 # plot F1 scores per method across cell type abundance groups
 image = ggplot(df_all_avg_clean, aes(x = factor(abundance_ct_0), y = F1, color = comparison_preference, group = interaction(comparison_preference, abundance_ct_0))) +
   geom_boxplot() +
-  facet_wrap((. ~ tool), nrow = 2, ncol = 5) +
+  facet_wrap((. ~ tool), nrow = 2, ncol = 6) +
   #facet_grid(. ~ tool) +
   theme_test()  +
   theme(axis.text.x = element_text(size = 10, angle = 90, vjust = 0.5, hjust = 1)) +
@@ -309,13 +317,13 @@ image = ggplot(df_all_avg_clean, aes(x = factor(abundance_ct_0), y = F1, color =
   scale_colour_brewer(palette = "Dark2", name = "Cohort Comparison") +ylim(0.2,1)
 image
 
-ggsave(file = output_path_Fig2d_boxplots_sym, plot = image, width = 15, height = 3.5)
+ggsave(file = output_path_Fig2d_boxplots_sym, plot = image, width = 9.5, height = 5.5)
 ```
 
 Add a summary boxplot to it
 ```{r, fig.width = 9}
 df_all_avg_clean_filtered =  df_all_avg_clean #%>% filter(abundance_ct_0 != "0.05")
-custom_palette <- c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666", "white", "#76B1F1")
+custom_palette <- c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666", "#c44e52", "white", "#76B1F1")
 
 image2 <- ggplot(df_all_avg_clean_filtered, aes(x = tool, y = F1)) +
   geom_boxplot(aes(fill = tool), color = "black", outlier.size = 1, outlier.shape = 16) + 
@@ -339,8 +347,56 @@ image2 <- ggplot(df_all_avg_clean_filtered, aes(x = tool, y = F1)) +
 image2
 
 # save the images, either for the symmetric or asymmetric dataset
-ggsave(output_path_Fig2b_summary_boxplots_sym, plot = image2, device = "svg", width = 7, height = 4.5)
+ggsave(output_path_Fig2b_summary_boxplots_sym, plot = image2, device = "svg", width = 7.5, height = 4.5)
 ```
+# feature importances
+
+## Plotting Feature importances and Cosine similarity for asymmetric dataset
+
+```{r}
+feature_exploration = result_list[[2]]
+
+features = result_list[seq(2, length(result_list), by = 2)]
+names(features) = unique(names(all))
+
+for (i in 1:length(features)) {
+  first_columns <- lapply(features[[i]], function(df) df[[1]])
+  features[[i]] <- do.call("cbind", first_columns)
+  colnames(features[[i]]) <- paste0("Col_", seq_along(first_columns))
+}
+
+```
+
+
+Create plot to check highest feature importances (Appendix Figure 5)
+```{r}
+featurenames_025 = grep("ab0_0.25_self00_0.6_vs_ran|ab0_0.25_ran_vs_self00_0.6", names(features))
+features_025 = features[featurenames_025]
+features_025 = features_025[!grepl("ct_abundances", names(features_025))]
+names(features_025) 
+
+df_merge <- data.frame()
+for (i in 1:length(features_025)){
+  df = t(rowMeans(features_025[[i]]))
+  df_merge = rbind(df_merge, df)
+}
+
+rownames(df_merge) = gsub("_ab0_0.25_self00_0.6_vs_ran", "", names(features_025))
+rownames(df_merge) = gsub("_abundance", "", rownames(df_merge))
+rownames(df_merge) = gsub("_delaunay", "", rownames(df_merge))
+colnames(df_merge) = gsub("`", "", colnames(df_merge))
+
+svg(output_path_appendix_Fig5_heatmap, width = 7, height = 2)
+pheatmap(as.matrix(df_merge),
+         treeheight_row = 0,
+         treeheight_col = 0)
+dev.off()
+
+pheatmap(as.matrix(df_merge),
+         treeheight_row = 0,
+         treeheight_col = 0)
+```
+
 
 ```{r}
 sessionInfo()

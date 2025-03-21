@@ -28,17 +28,18 @@ library(randomForest)
 library(doRNG)
 ```
 
+
 Paths to data and plots to be saved
 ```{r}
 #Path to folder containing with all NEP pair x sample .csv files of the NEP methods to compare
 csv_dir = "./../../../20250218_results_asym/"
 
 #plot paths
-output_path_Figure3d_heatmaps_asym = "./../../../../../Paper_figures/condzscore_v3/heatmap_0110_values_asym_ab01_ab055.svg"
-output_path_Fig3b_boxplots_asym = "./../../../../../Paper_figures/condzscore_v3/asym_F1_detailed_2rows.svg"
-output_path_appendix_Fig3_summary_boxplots_F1_asym = "./../../../../../Paper_figures/condzscore_v3/appendix_asymmetric_comparison_F1_summary_w_0.05.svg"
-output_path_appendix_Fig5_heatmap = "./../../../../../Paper_figures/condzscore_v3/feature_importances_ran_vs_strong_0025.svg"
-output_path_Fig3c_summary_boxplots_cosine = "./../../../../../Paper_figures/condzscore_v3/asymmetric_comparison_cosinesim_summary_w_0.05.svg"
+output_path_Figure3d_heatmaps_asym = "./../../../../../Paper_figures/condzscore_v3/heatmap_0110_values_asym_ab01_ab055_final.svg"
+output_path_Fig3b_boxplots_asym = "./../../../../../Paper_figures/condzscore_v3/asym_F1_detailed_2rows_final.svg"
+output_path_appendix_Fig3_summary_boxplots_F1_asym = "./../../../../../Paper_figures/condzscore_v3/appendix_asymmetric_comparison_F1_summary_w_0.05_final.svg"
+output_path_appendix_Fig5_heatmap = "./../../../../../Paper_figures/condzscore_v3/feature_importances_ran_vs_strong_0025_final.svg"
+output_path_Fig3c_summary_boxplots_cosine = "./../../../../../Paper_figures/condzscore_v3/asymmetric_comparison_cosinesim_summary_w_0.05_final.svg"
 
 # Set seed for reproducibility
 set.seed(123)
@@ -47,7 +48,8 @@ set.seed(123)
 
 Load in all different result files and streamline their NEP pair naming
 ```{r}
-data <- list.files(path = csv_dir, recursive = FALSE, pattern = "\\.csv$")
+data <- sort(list.files(path = csv_dir, recursive = FALSE, pattern = "\\.csv$"))
+
 all = list()
 for (i in 1:length(data)){
   all[[i]] <- as.data.frame(read_csv(paste0(csv_dir,data[i])))
@@ -63,7 +65,7 @@ for (i in 1:length(data)){
 
 ## Data wrangling
 
-Make correct order of features and double the features for Giotto to imitate bi-directional counting
+Make correct order of features and double the features for Giotto to imitate bi-directional counting. Introduce homointeractions for Cellcharter that ignored similar interactions.
 ```{r}
 giotto_inidces <- which(sapply(all, function(df) ncol(df) == 10))
 for (i in giotto_inidces){
@@ -82,11 +84,21 @@ modify_row_names <- function(row_name) {
 for (i in 1:length(all)){
     colnames(all[[i]]) <- as.vector(sapply(colnames(all[[i]]), modify_row_names))
     }
-
+data
 # correct order for ground truth later 
 ordered_cols <- c("0_0", "0_1", "0_2", "0_3", "1_0", "1_1", "1_2", "1_3", "2_0", "2_1", "2_2", "2_3", "3_0", "3_1", "3_2", "3_3")
 # Combine the results into the stat list
 for (i in 1:length(all)) {
+  # add cellcharter homointeractions as 0 columns
+  if (ncol(all[[i]]) == 12) {
+        df_new <- data.frame(
+      "0_0" = rep(0, nrow(all[[i]])),
+      "1_1" = rep(0, nrow(all[[i]])),
+      "2_2" = rep(0, nrow(all[[i]])),
+      "3_3" = rep(0, nrow(all[[i]])))
+      all[[i]]=cbind(all[[i]], df_new)
+      colnames(all[[i]]) = gsub("X", "", colnames(all[[i]]))
+  }
   if (ncol(all[[i]]) == 16) {
       # Reorder rows of dataset1 using the ordered row names
       all[[i]] <- all[[i]][, ordered_cols , drop = FALSE]
@@ -118,8 +130,9 @@ for (i in 1:length(all)){
   all[[i]]$abundance = sub("_sim", "", all[[i]]$abundance)
   all[[i]] <- all[[i]][order(rownames(all[[i]])), ]
 }
-```
 
+data
+```
 
 Make specific plots for Fig 3d of raw NEP scores between red-yellow and yellow-red interactions
 ```{r, fig.height = 10}
@@ -129,7 +142,7 @@ column_order <- NULL
 abundances = unique(all[[2]]$abundance)
 
 # Loop over the patterns, excluding cell type abundance group
-for (i in c(1,3:10)) {
+for (i in c(1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12)) {
   # Calculate the means for each combination of preference and abundance
     df = all[[i]] %>% filter(abundance != "ab0_0.05")
   
@@ -154,7 +167,7 @@ for (i in c(1,3:10)) {
     heatmap_data <- heatmap_data[match(order_rows, rownames(heatmap_data)), ]
     
     # only make columnsnames for the last plot
-    if (i != 10){
+    if (i != 12){
       heatmaps[[i]] = pheatmap(as.matrix(heatmap_data),
              display_numbers = F, 
              silent = TRUE, 
@@ -175,7 +188,7 @@ for (i in c(1,3:10)) {
 }
 
 # Arrange heatmaps vertically using grid.arrange
-heatmaps <- heatmaps[-2]
+heatmaps <- heatmaps[-4]
 n <- length(heatmaps)
 
 # Create a layout matrix for stacking heatmaps vertically
@@ -228,6 +241,8 @@ stat = list()
 # Create an index variable for the two groups
 group_index <- rep(c("A","B"), each=100)
 
+# for random model baseline, randomly shuffle the group_index
+
 # Calculate the F1 and FDR score
 F1_Score <- function(predictions, actual) {
   TP <- sum(predictions == "B" & actual == "B")
@@ -268,6 +283,10 @@ num_iterations <- 100
 
 # Run parallel loop
 foreach(i = 1:length(all), .combine = c, .packages = c("caret","randomForest")) %dopar% {
+  ################################################################
+  #### for random model baseline in Appendix Figure 2, randomly shuffle the group_index
+  #group_index = sample(group_index)
+  ################################################################
   set.seed(42 + i)  
   data <- cbind(all[[i]], group_index)
   result <- list()
@@ -346,10 +365,12 @@ mutate(tool = recode(tool,
                      "ct" = "Cell type",
                      "squidpy_count_delaunay" = "Interactions",
                      "Giotto_delaunay" = "Giotto",
-                     "IMCRhistoCAT_p_lt_delaunay" = "histoCAT",
-                     "IMCRclassic_p_lt_delaunay" = "IMCR classic",
+                     "histoCAT_sigval_delaunay" = "histoCAT",
+                     "IMCRtools_classic_sigval_delaunay" = "IMCR classic",
                      "Misty_delauany" = "Misty",
                      "cond_zscore_scimap_delaunay" = "COZI",
+                     "cellcharter_enrichment_delaunay" = "Cellcharter",
+                     "cellcharter_notsymmetric_nohomo_enrichment_delaunay" = "Cellcharter*",
                      "squidpy_zscore_delaunay" = "Squidpy",
                      "scimap_delaunay" = "scimap",
                      "SEA_zscore_scimap_delaunay" = "SEA"
@@ -364,14 +385,15 @@ mutate(comparison_preference = recode(comparison_preference,
                      ))
 
 # Define your custom order
-custom_tool_order <- c("Cell type", "Interactions", "Giotto", "scimap", "IMCR classic", "histoCAT", "SEA", "Squidpy", "COZI", "Misty")  # Replace with your actual tool names
+custom_tool_order <- c("Cell type", "Interactions", "Giotto", "scimap", "IMCR classic", "histoCAT", "SEA", "Squidpy", "Cellcharter", "Cellcharter*","COZI", "Misty")  # Replace with your actual tool names
+df_all_avg_clean = df_all_avg_clean %>% filter(tool %in% custom_tool_order)
 
 # Convert 'tool' column into a factor with the specified order
 df_all_avg_clean$tool <- factor(df_all_avg_clean$tool, levels = custom_tool_order)
 
 image = ggplot(df_all_avg_clean, aes(x = factor(abundance_ct_0), y = F1, color = comparison_preference, group = interaction(comparison_preference, abundance_ct_0))) +
   geom_boxplot() +
-  facet_wrap(. ~ tool, nrow = 2, ncol = 5) +
+  facet_wrap(. ~ tool, nrow = 2, ncol = ) +
   theme_test()  +
   theme(axis.text.x = element_text(size = 10, angle = 90, vjust = 0.5, hjust = 1)) +
   xlab("Abundance ct 1") +
@@ -381,17 +403,17 @@ image = ggplot(df_all_avg_clean, aes(x = factor(abundance_ct_0), y = F1, color =
     axis.text.y = element_text(size = 9),
     strip.text = element_text(size = 14)  
   ) +
-  scale_x_discrete(labels=c('0.18 - 0.26', '0.20 - 0.26', '0.21 - 0.26', '0.24 - 0.25', '0.25', '0.25-0.27', '0.24-0.29', '0.24-0.3')) +
+  scale_x_discrete(labels=c('0.18 - 0.26', '0.20 - 0.26', '0.21 - 0.26', '0.24 - 0.25', '0.25', '0.25-0.29', '0.24-0.32', '0.24-0.36')) +
   scale_colour_brewer(palette = "Dark2", name = "Cohort Comparison") +ylim(0.2,1)
 image
 
-ggsave(file = output_path_Fig3b_boxplots_asym, plot = image, width = 9, height = 6)
+ggsave(file = output_path_Fig3b_boxplots_asym, plot = image, width = 10, height = 6)
 ```
 
 Add a summary boxplot to it
 ```{r, fig.width = 9}
 df_all_avg_clean_filtered =  df_all_avg_clean #%>% filter(abundance_ct_0 != "0.05")
-custom_palette <- c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666", "white", "#76B1F1")
+custom_palette <- c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666", "#c44e52", "#f2a8aa","white", "#76B1F1")
 
 image2 <- ggplot(df_all_avg_clean_filtered, aes(x = tool, y = F1)) +
   geom_boxplot(aes(fill = tool), color = "black", outlier.size = 1, outlier.shape = 16) + 
@@ -415,7 +437,7 @@ image2 <- ggplot(df_all_avg_clean_filtered, aes(x = tool, y = F1)) +
 image2
 
 # save the images, either for the symmetric or asymmetric dataset
-ggsave(output_path_appendix_Fig3_summary_boxplots_F1_asym, plot = image2, device = "svg", width = 7, height = 4.5)
+ggsave(output_path_appendix_Fig3_summary_boxplots_F1_asym, plot = image2, device = "svg", width = 8, height = 4.5)
 ```
 
 ## Plotting Feature importances and Cosine similarity for asymmetric dataset
@@ -453,7 +475,7 @@ rownames(df_merge) = gsub("_abundance", "", rownames(df_merge))
 rownames(df_merge) = gsub("_delaunay", "", rownames(df_merge))
 colnames(df_merge) = gsub("`", "", colnames(df_merge))
 
-svg(output_path_appendix_Fig5_heatmap, width = 5, height = 2)
+svg(output_path_appendix_Fig5_heatmap, width = 6, height = 2)
 pheatmap(as.matrix(df_merge),
          treeheight_row = 0,
          treeheight_col = 0)
@@ -527,19 +549,13 @@ cosine_similarities <- as.data.frame(do.call("rbind", cosine_similarities))
 
 ```{r}
 # Cosine similarities w/o cell type abundances
-# wrangling
-back = cosine_similarities
-cosine_similarities = as.data.frame(back)
-
 colnames(cosine_similarities) = 1:ncol(cosine_similarities)
 cosine_similarities$comparison <- sub(".*_sim_", "", rownames(cosine_similarities))
-#cosine_similarities$comparison <- sub("^.*0.[0-9]+_cross01", "cross01", cosine_similarities$comparison)
+
 # this is the comaprison without abundance: 
-cosine_similarities$comparison <- sub(".*_ab._[0-9]\\.[0-9]*_", "", rownames(cosine_similarities))#, just took me long and I did not want to delete it
+cosine_similarities$comparison <- sub(".*_ab._[0-9]\\.[0-9]*_", "", rownames(cosine_similarities))
 cosine_similarities$tool <- sub("_ab.*", "", rownames(cosine_similarities))
 cosine_similarities$abundance_ct_0 = sub("^.*ab0_", "", rownames(cosine_similarities))
-#cosine_similarities$abundance_ct_0 = sub("sim.*$", "", cosine_similarities$abundance_ct_0)
-#cosine_similarities$abundance_ct_0 = sub("_cross01_.*_vs_.*$", "", cosine_similarities$abundance_ct_0)
 cosine_similarities$abundance_ct_0 = sub("_[ran|self].*", "", cosine_similarities$abundance_ct_0)
 cosine_similarities$abundance_ct_0 = sub("_cross.*", "", cosine_similarities$abundance_ct_0)
 
@@ -548,7 +564,8 @@ cosine_similarities = gather(cosine_similarities, value = "cosine_similarity", k
 unique(cosine_similarities$tool)
 
 
-custom_palette <- c("#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666", "white", "#76B1F1")
+custom_palette <- c("#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666", "#c44e52", "#f2a8aa","white", "#76B1F1")
+
 
 cosine_similarities_clean = cosine_similarities %>%
    #filter(abundance_ct_0 != "0.05") %>%
@@ -556,10 +573,12 @@ cosine_similarities_clean = cosine_similarities %>%
                        "ct" = "Cell type",
                        "squidpy_count_delaunay" = "Interactions",
                        "Giotto_delaunay" = "Giotto",
-                       "IMCRhistoCAT_p_lt_delaunay" = "histoCAT",
-                       "IMCRclassic_p_lt_delaunay" = "IMCR classic",
+                       "histoCAT_sigval_delaunay" = "histoCAT",
+                       "IMCRtools_classic_sigval_delaunay" = "IMCR classic",
                        "Misty_delauany" = "Misty",
                        "cond_zscore_scimap_delaunay" = "COZI",
+                       "cellcharter_enrichment_delaunay" = "Cellcharter",
+                       "cellcharter_notsymmetric_nohomo_enrichment_delaunay" = "Cellcharter*",
                        "squidpy_zscore_delaunay" = "Squidpy",
                        "scimap_delaunay" = "scimap",
                        "SEA_zscore_scimap_delaunay" = "SEA"
@@ -575,7 +594,7 @@ cosine_similarities_clean = cosine_similarities %>%
 
 cosine_similarities_clean_filtered =  cosine_similarities_clean 
 # Define your custom order
-custom_tool_order <- c("Cell type", "Interactions", "Giotto", "scimap", "IMCR classic", "histoCAT", "SEA", "Squidpy", "COZI", "Misty")  
+custom_tool_order <- c("Interactions", "Giotto", "scimap", "histoCAT", "IMCR classic","SEA", "Squidpy", "Cellcharter", "Cellcharter*","COZI", "Misty")  
 cosine_similarities_clean_filtered$tool <- factor(cosine_similarities_clean_filtered$tool, levels = custom_tool_order)
 
 # Updated plot for publication
@@ -599,9 +618,15 @@ image2 <- ggplot(cosine_similarities_clean_filtered, aes(x = tool, y = cosine_si
 
 # Plot
 image2
-ggsave(output_path_Fig3c_summary_boxplots_cosine, plot = image2, device = "svg", width = 6.5, height = 4)
+ggsave(output_path_Fig3c_summary_boxplots_cosine, plot = image2, device = "svg", width = 8, height = 4.5)
 ```
 
 ```{r}
 sessionInfo()
+
+# save files
+writeLines(capture.output({
+  print(R.version.string)  
+  sessioninfo::session_info()  
+}), "session_info.txt")
 ```

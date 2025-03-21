@@ -34,9 +34,9 @@ Paths to data and plots to be saved
 csv_dir = "./../../../20250218_results_sym/"
 
 #plot paths
-output_path_Fig2d_boxplots_sym = "./../../../../../Paper_figures/condzscore_v3/sym_F1_detailed_2rows_wcellcharter_baseline.svg"
-output_path_Fig2b_summary_boxplots_sym = "./../../../../../Paper_figures/condzscore_v3/sym_comparison_F1_summary_alltools_wcellcharter_baseline.svg"
-output_path_appendix_Fig5_heatmap = "./../../../../../Paper_figures/condzscore_v3/appendix_sym_feature_imp_heatmap_wcellcharter_baseline.svg"
+output_path_Fig2d_boxplots_sym = "./../../../../../Paper_figures/condzscore_v3/sym_F1_detailed_2rows_wcellcharter_final.svg"
+output_path_Fig2b_summary_boxplots_sym = "./../../../../../Paper_figures/condzscore_v3/sym_comparison_F1_summary_alltools_wcellcharter_final.svg"
+output_path_appendix_Fig5_heatmap = "./../../../../../Paper_figures/condzscore_v3/appendix_sym_feature_imp_heatmap_wcellcharter_final.svg"
 
 # Set seed for reproducibility
 set.seed(123)
@@ -276,8 +276,8 @@ mutate(tool = recode(tool,
                      "ct" = "Cell type",
                      "squidpy_count_delaunay" = "Interactions",
                      "Giotto_delaunay" = "Giotto",
-                     "IMCRhistoCAT_p_lt_delaunay" = "histoCAT",
-                     "IMCRclassic_p_lt_delaunay" = "IMCR classic",
+                     "histoCAT_sigval_delaunay" = "histoCAT",
+                     "IMCRtools_classic_sigval_delaunay" = "IMCR classic",
                      "Misty_delauany" = "Misty",
                      "cond_zscore_scimap_delaunay" = "COZI",
                      "squidpy_zscore_delaunay" = "Squidpy",
@@ -296,6 +296,7 @@ mutate(tool = recode(tool,
 
 # Define your custom order
 custom_tool_order <- c("Cell type", "Interactions", "Giotto", "scimap", "IMCR classic", "histoCAT", "SEA", "Squidpy", "Cellcharter", "COZI", "Misty")
+df_all_avg_clean = df_all_avg_clean %>% filter(tool %in% custom_tool_order)
 
 df_all_avg_clean$tool <- factor(df_all_avg_clean$tool, levels = custom_tool_order)
 

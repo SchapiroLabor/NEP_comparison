@@ -7,7 +7,7 @@ Studying the spatial distribution of cell types in tissues is essential for unde
 ## This repository
 We systematically compared the NEP methods Giotto, IMCRtools (classic and histoCAT), MISTy, SEA, Squidpy, Scimap, CellCharter and our newly proposed method COZI. In this repo, we load the NEP results of different tissue organization cohorts (repo: IST_generation) and perform binary classification between two cohorts with differing tissue organization parameters. We perfom the classification with a random forest classifier. Further, we evaluate the distinction performance with the F1 score and the cosine similarity between the feature importances and ground-truth cell-cell adjacency vectors. We further explore the NEP methods on a myocardial infarction (MI) dataset
 
-![Overview Figure 1](images/fig1_overview.png)
+![Overview Figure 1](images/Figure1.png)
 
 ### Structure
 

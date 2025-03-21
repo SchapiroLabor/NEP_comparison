@@ -18,9 +18,9 @@ library(caret)
 library(tidyverse)
 
 ### DATA PATHS
-csv_dir = "./../../20250218_results_sym/"
+csv_dir = "./../../../Comparison/20250218_results_sym/"
 data <- list.files(path = csv_dir, recursive = FALSE, pattern = "\\.csv$")
-output_folder = "./../../../../Paper_figures/condzscore_v3/interaction_scores/"
+output_folder = "./../../../../Paper_figures/condzscore_v3/interaction_scores_wcellcharter/"
 
 ### DATA WRANGLING
 all = list()
@@ -93,11 +93,14 @@ names = names(df_comb)
 all = df_comb
 
 ### PLOTTING
-
+#i =
+#test = all[grep("0.25_self00_0.45_vs_self00_0.6|0.25_self00_0.6_vs_self00_0.45", names)]
 # extract weak vs strong comparison for NEP 0-1 and 1-0 at abundance 25%
 for (i in grep("0.25_self00_0.45_vs_self00_0.6|0.25_self00_0.6_vs_self00_0.45", names)){
+  if(i!=60){ #exclude ct abundance
+    print(i)
   groups = rep(unlist(strsplit(names(all[i]), "_vs_")), each = 100)
-  data = as.data.frame(cbind(rownames(all[[i]]), as.numeric(all[[i]][,1]), groups))
+  data = as.data.frame(cbind(rownames(all[[i]]), as.numeric(all[[i]][,1]), groups)) # take the first column, so 0_0 values CHANGED TO 2 !!!
   data$V2 = as.numeric(data$V2)
   legend = rep(c("weak", "strong"), each = 100)
   
@@ -109,6 +112,33 @@ for (i in grep("0.25_self00_0.45_vs_self00_0.6|0.25_self00_0.6_vs_self00_0.45", 
           scale_fill_manual(values = c("darkred", "darkblue"))
           
         
-  ggsave(filename = paste0(output_folder, names[i], ".svg"), plot = plot_histo, width = 4, height = 1.5)
-          
+  ggsave(filename = paste0(output_folder, names[i], "_0_0.svg"), plot = plot_histo, width = 4, height = 1.5)
+  }   
 }
+
+# overall score distributions
+
+### PLOTTING
+#i =
+#test = all[grep("0.25_self00_0.45_vs_self00_0.6|0.25_self00_0.6_vs_self00_0.45", names)]
+# extract weak vs strong comparison for NEP 0-1 and 1-0 at abundance 25%
+for (i in grep("scimap", names)){
+  if(i!=60){ #exclude ct abundance
+    print(i)
+    groups = rep(unlist(strsplit(names(all[i]), "_vs_")), each = 100)
+    data = as.data.frame(cbind(rownames(all[[i]]), as.numeric(all[[i]][,1]), groups)) # take the first column, so 0_0 values CHANGED TO 2 !!!
+    data$V2 = as.numeric(data$V2)
+    legend = rep(c("weak", "strong"), each = 100)
+    
+    plot_histo = ggplot(data, aes(x = V2, fill = legend)) +
+      geom_histogram (bins = 50) +
+      facet_grid(. ~ groups) +
+      labs(title = names(all)[i], x = "interaction_value", y = "Frequency") +
+      theme_classic() +
+      scale_fill_manual(values = c("darkred", "darkblue"))
+    
+    
+    ggsave(filename = paste0(output_folder, names[i], "SCIMAP_0_0.svg"), plot = plot_histo, width = 4, height = 1.5)
+  }   
+}
+

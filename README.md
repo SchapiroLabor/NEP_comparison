@@ -1,5 +1,4 @@
 # Comparison and Optimization of Cellular Neighbor Preference (NEP) Methods for Quantitative Tissue Analysis
-Author: Chiara Schiller
 
 Preprint: https://www.biorxiv.org/content/10.1101/2025.03.31.646289v2
 

@@ -26,7 +26,7 @@ We systematically compared the NEP methods provided by Giotto, IMCRtools (classi
 `/images`: 
 - `/Figure1.png`: Overview image Figure 1.
 
-  `/simulated_data`: 
+`/simulated_data`: 
 - `/asym01_nbh2_1000dim_grid200_300iter_50swaps.zip`: Simulated data analysed by the methods, asymmetric cohort.
 - `/sym00_nbh2_1000dim_grid200_300iter_50swaps.zip`: Simulated data analysed by the methods, symmetric cohort.
 

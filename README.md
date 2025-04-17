@@ -1,8 +1,5 @@
 # Comparison and Optimization of Cellular Neighbor Preference (NEP) Methods for Quantitative Tissue Analysis
 
-Preprint: https://www.biorxiv.org/content/10.1101/2025.03.31.646289v2
-
-## Introduction
 Studying the spatial distribution of cell types in tissues is essential for understanding their function in health and disease. A widely used spatial feature for quantifying tissue organization is the pairwise neighbor preference (NEP) of cell types, also termed co-occurrence or colocalization. Various methods to infer NEPs have proved their utility in numerous biological studies, but despite their broad usage in the spatial biology community, no clear guidelines exist for selecting one method over the other. In this github repository, we study the methods on two aspects: (1) their discriminatory power to distinguish different tissue architectures and (2) their ability to recover the directionality of NEPs. We conducted method performance comparison with in silico tissue simulated data and showcased its biological applicability to a myocardial infarction dataset studying immune cell infiltration. The method results used in this github repository can be generated with the linked method specific github repositories.
 
 ## This repository
@@ -27,7 +24,11 @@ We systematically compared the NEP methods provided by Giotto, IMCRtools (classi
 - `/overall_NEP_scores_plot.R`: Creates figures for distribution of all raw NEP scores of the symmetric cohort across methods (Appendix Figure 3 in manuscript).
 
 `/images`: 
-- `/Figure1.png`: Overview image Figure 1. 
+- `/Figure1.png`: Overview image Figure 1.
+
+`/simulated_data`: 
+- `/asym01_nbh2_1000dim_grid200_300iter_50swaps.zip`: Simulated data analysed by the methods, asymmetric cohort.
+- `/sym00_nbh2_1000dim_grid200_300iter_50swaps.zip`: Simulated data analysed by the methods, symmetric cohort.
 
 ### Dependencies
 
@@ -46,8 +47,15 @@ NEP analysis results of simulated and MI data were generated using the listed re
 - https://github.com/SchapiroLabor/NEP_Squidpy (Squidpy, CellCharter and cell and interaction counts)
 - https://github.com/SchapiroLabor/NEP_MistyR (MistyR)
 
+#### Simulated data
+
+The simulated data analysed by the methods can be found here https://github.com/SchapiroLabor/NEP_comparison/tree/main/simulated_data, or can be generated as described here: https://github.com/SchapiroLabor/NEP_IST_generation. 
+
 #### MI data
 
 Sequential Immunofluorescence data was accessed via Synapse (project SynID : syn51449054): https://www.synapse.org/Synapse:syn51449054. The dataframe with phenotypes was accessed within the project at:  https://www.synapse.org/Synapse:syn65487454.
+
+## Citation
+Schiller et al. Comparison and Optimization of Cellular Neighbor Preference Methods for Quantitative Tissue Analysis. bioRxiv (2025) [doi:10.1101/2024.12.20.629764](https://doi.org/10.1101/2025.03.31.646289)
 
 

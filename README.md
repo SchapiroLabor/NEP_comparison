@@ -43,7 +43,7 @@ NEP analysis results of simulated and MI data were generated using the listed re
 
 - https://github.com/SchapiroLabor/NEP_Giotto (Giotto)
 - https://github.com/SchapiroLabor/NEP_IMCRtools (IMCRtools classic and histoCAT)
-- https://github.com/SchapiroLabor/NEP_Scimap (COZI, SEA and Scimap)
+- https://github.com/SchapiroLabor/NEP_Scimap (COZI, SEA and Scimap) --> new conditional count thresholding, not included in v0.1.0. Sets inflated values for pairs with low numbers of neighboring cells to 0.
 - https://github.com/SchapiroLabor/NEP_Squidpy (Squidpy, CellCharter and cell and interaction counts)
 - https://github.com/SchapiroLabor/NEP_MistyR (MistyR)
 

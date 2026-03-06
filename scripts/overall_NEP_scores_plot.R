@@ -77,12 +77,34 @@ for (i in 1:length(all)){
   all[[i]]$abundance = sub("_sim", "", all[[i]]$abundance)
 }
 
-names(all) = data
+raw_names <- tools::file_path_sans_ext(basename(data))
+names(all) <- raw_names
 
+# --- dictionary: raw file identifiers -> pretty tool names ---
+# IMPORTANT: the LEFT side must match your actual filename stems in `raw_names`
+tool_map <- c(
+  "cellcharter_enrichment_delaunay_4ct_self00" = "CellCharter",
+  "cond_zscore_scimap_delaunay_4ct_self00" = "COZI",
+  "Giotto_delaunay_4ct_self00" = "Giotto",
+  "histoCAT_sigval_delaunay_4ct_self00" = "histoCAT",
+  "IMCRtools_classic_sigval_delaunay_4ct_self00" = "IMCRtools",
+  "Misty_delauany_4ct_self00" = "Misty",
+  "scimap_delaunay_4ct_self00" = "Scimap",
+  "SEA_zscore_scimap_delaunay_4ct_self00" = "SEA",
+  "squidpy_count_delaunay_4ct_self00" = "Interaction count",
+  "squidpy_zscore_delaunay_4ct_self00" = "Squidpy"
+)
+
+# --- rename tools using dictionary (keeps unmatched names unchanged) ---
+names(all) <- dplyr::recode(names(all), !!!tool_map, .default = names(all))
+
+# --- choose tools to include (use the FINAL pretty names) ---
+include <- c("CellCharter", "COZI", "Giotto", "histoCAT", "IMCRtools",
+             "Misty", "Scimap", "SEA", "Interaction count", "Squidpy")
+
+all <- all[names(all) %in% include]
 ### PLOTTING
 plots <- list()  # Store individual plots
-names(all) = c("CellCharter", "COZI", "ct_abundances", "Giotto", "histoCAT", "IMCRclassic_not", "hist_not", "IMCRtools", "Misty", "Scimap", "SEA", "Interaction count", "Squidpy")
-include= c("CellCharter", "COZI", "Giotto", "histoCAT", "IMCRtools", "Misty", "Scimap", "SEA", "Interaction count", "Squidpy")
 
 all = all[names(all) %in% include]
 
@@ -98,6 +120,15 @@ for (i in 1:length(all)) {
                                labels = c("random", "weak", "strong")))
   
   colnames(data) <- c("interaction", "preference")
+  
+  # SAVE per tool: raw source data used for the plot
+  tool_name <- names(all)[i]
+  tool_name_safe <- gsub("[^A-Za-z0-9_\\-]+", "_", tool_name)
+  source_folder = "./../../../../data/Source_data/Source_sup_3/"
+  write_csv2(
+    data,
+    file.path(source_folder, paste0(tool_name_safe, ".csv"))
+  )
   
   plot_histo <- ggplot(data, aes(x = interaction, fill = preference)) +
     geom_histogram(bins = 50) +
@@ -115,6 +146,6 @@ for (i in 1:length(all)) {
 combined_plot = grid.arrange(grobs = plots, ncol = 2) 
 # Combine all plots into one figure
 # Save combined plot
-ggsave(filename = paste0(output_folder, "Overall_Plots.svg"), plot = combined_plot, width = 7, height = 9)
+ggsave(filename = paste0(output_folder, "Overall_Plots_finalsub.svg"), plot = combined_plot, width = 7, height = 9)
 
 

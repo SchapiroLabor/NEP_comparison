@@ -20,7 +20,8 @@ library(tidyverse)
 ### DATA PATHS
 csv_dir = "./../../../Comparison/20250218_results_sym/"
 data <- list.files(path = csv_dir, recursive = FALSE, pattern = "\\.csv$")
-output_folder = "./../../../../Paper_figures/condzscore_v3/interaction_scores_wcellcharter/"
+#output_folder = "./../../../../Paper_figures/condzscore_v3/interaction_scores_wcellcharter/"
+output_folder = "./../../../../Paper_figures/condzscore_v3/Source_data_plotting/"
 
 ### DATA WRANGLING
 all = list()
@@ -111,6 +112,12 @@ for (i in grep("0.25_self00_0.45_vs_self00_0.6|0.25_self00_0.6_vs_self00_0.45", 
     data$legend <- factor(data$legend, levels = c("weak", "strong"))
     data$group <- factor(data$group, levels = unique(groups))  # will match weak first if it's first in `names`
     
+    write.csv2(
+      data,
+      file = paste0(output_folder, names[i], "_0_0.csv"),
+      row.names = FALSE,
+      fileEncoding = "UTF-8"
+    )
     # plot
     plot_histo = ggplot(data, aes(x = interaction_value, fill = legend)) +
       geom_histogram(bins = 50) +

@@ -34,9 +34,9 @@ Paths to data and plots to be saved
 csv_dir = "./../../../20250218_results_sym/"
 
 #plot paths
-output_path_Fig2d_boxplots_sym = "./../../../../../Paper_figures/condzscore_v3/sym_F1_detailed_2rows_wcellcharter_final.svg"
-output_path_Fig2b_summary_boxplots_sym = "./../../../../../Paper_figures/condzscore_v3/sym_comparison_F1_summary_alltools_wcellcharter_final.svg"
-output_path_appendix_Fig5_heatmap = "./../../../../../Paper_figures/condzscore_v3/appendix_sym_feature_imp_heatmap_wcellcharter_final.svg"
+output_path_Fig2d_boxplots_sym = "./../../../../../Paper_figures/condzscore_v3/sym_F1_detailed_2rows_wcellcharter.svg"
+output_path_Fig2b_summary_boxplots_sym = "./../../../../../Paper_figures/condzscore_v3/sym_comparison_F1_summary_alltools_wcellcharter.svg"
+output_path_appendix_Fig5_heatmap = "./../../../../../Paper_figures/condzscore_v3/appendix_sym_feature_imp_heatmap_wcellcharter.svg"
 
 # Set seed for reproducibility
 set.seed(123)
@@ -178,6 +178,9 @@ unregister_dopar()
 ```
 
 
+
+
+
 Parallelize 100 iterations
 ```{r}
 # Set the number of cores to use
@@ -202,6 +205,7 @@ foreach(i = 1:length(all), .combine = c, .packages = c("caret","randomForest")) 
   for (x in 1:num_iterations){
     set.seed(42 + x)
     ##########################################
+    # for random, otehrwise delete
     #data$group_index = sample(data$group_index)
     ##########################################
     # Split data into training and test sets
@@ -244,6 +248,11 @@ df$tool = rep(names(all), each = 100)
 colnames(df) = c("F1", "FDR", "Run")
 ```
 
+```{r}
+df
+```
+
+
 ## Plotting F1 scores
 
 Create plot to show comparison
@@ -261,6 +270,7 @@ df$tool <- sub("_ab.*", "", df$Run)
 df$abundance = sub("^(.+?)_[^_]+_(.*)", "\\1", df$comparison)
 unique(df$tool)
 ```
+
 
 ## Plot F1 scores
 ```{r, fig.width=15, fig.height = 5}
@@ -318,13 +328,39 @@ image = ggplot(df_all_avg_clean, aes(x = factor(abundance_ct_0), y = F1, color =
   scale_colour_brewer(palette = "Dark2", name = "Cohort Comparison") +ylim(0.2,1)
 image
 
-ggsave(file = output_path_Fig2d_boxplots_sym, plot = image, width = 9.5, height = 5.5)
+#ggsave(file = output_path_Fig2d_boxplots_sym, plot = image, width = 9.5, height = 5.5)
+
 ```
+```{r}
+# print source data
+df_all_avg_clean$abundance_ct_0 <- recode(
+  df_all_avg_clean$abundance_ct_0,
+  "0.05" = "0.14 - 0.22",
+  "0.1"  = "0.17 - 0.23",
+  "0.15" = "0.19 - 0.24",
+  "0.2"  = "0.22 - 0.24",
+  "0.25" = "0.25",
+  "0.35" = "0.26 - 0.31",
+  "0.45" = "0.28 - 0.36",
+  "0.55" = "0.29 - 0.41"
+)
+df_all_avg_clean
+unique(df_all_avg_clean$abundance_ct_0)
+
+#write.csv2(df_all_avg_clean, "./../../../../../data/Source_data/Source_2d.csv", row.names = TRUE, fileEncoding = "UTF-8")
+```
+
+```{r}
+# save source data
+df = df_all_avg_clean %>% select(tool, comparison_preference, abundance_ct_0, F1)
+write.csv2(df, "./../../../../../data/Source_data/Source_Sup_1a.csv", row.names = TRUE, fileEncoding = "UTF-8")
+```
+
 
 Add a summary boxplot to it
 ```{r, fig.width = 9}
 df_all_avg_clean_filtered =  df_all_avg_clean #%>% filter(abundance_ct_0 != "0.05")
-custom_palette <- c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666", "#c44e52", "white", "#76B1F1")
+custom_palette <- c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666", "#c44e52", "white", "#76B1F1", "yellow")
 
 image2 <- ggplot(df_all_avg_clean_filtered, aes(x = tool, y = F1)) +
   geom_boxplot(aes(fill = tool), color = "black", outlier.size = 1, outlier.shape = 16) + 
@@ -348,11 +384,16 @@ image2 <- ggplot(df_all_avg_clean_filtered, aes(x = tool, y = F1)) +
 image2
 
 # save the images, either for the symmetric or asymmetric dataset
-ggsave(output_path_Fig2b_summary_boxplots_sym, plot = image2, device = "svg", width = 7.5, height = 4.5)
+#ggsave(output_path_Fig2b_summary_boxplots_sym, plot = image2, device = "svg", width = 7.5, height = 4.5)
 ```
+```{r}
+df_all_avg_clean_filtered
+```
+
+
 # feature importances
 
-## Plotting Feature importances and Cosine similarity for asymmetric dataset
+### Plotting Feature importances and Cosine similarity for asymmetric dataset
 
 ```{r}
 feature_exploration = result_list[[2]]
@@ -371,7 +412,7 @@ for (i in 1:length(features)) {
 
 Create plot to check highest feature importances (Appendix Figure 5)
 ```{r}
-featurenames_025 = grep("ab0_0.25_self00_0.6_vs_ran|ab0_0.25_ran_vs_self00_0.6", names(features))
+featurenames_025 = grep("ab0_0.25_cross01_0.6_vs_ran|ab0_0.25_ran_vs_cross01_0.6", names(features))
 features_025 = features[featurenames_025]
 features_025 = features_025[!grepl("ct_abundances", names(features_025))]
 names(features_025) 
@@ -382,12 +423,31 @@ for (i in 1:length(features_025)){
   df_merge = rbind(df_merge, df)
 }
 
-rownames(df_merge) = gsub("_ab0_0.25_self00_0.6_vs_ran", "", names(features_025))
+rownames(df_merge) = gsub("_ab0_0.25_cross01_0.6_vs_ran", "", names(features_025))
 rownames(df_merge) = gsub("_abundance", "", rownames(df_merge))
 rownames(df_merge) = gsub("_delaunay", "", rownames(df_merge))
 colnames(df_merge) = gsub("`", "", colnames(df_merge))
 
-svg(output_path_appendix_Fig5_heatmap, width = 7, height = 2)
+# rename tools
+rename_map <- c(
+  "cellcharter_enrichment" = "CellCharter",
+  "cellcharter_notsymmetric_nohomo_enrichment"= "CellCharter*",
+  "cond_zscore_scimap"= "COZI",
+  "IMCRtools_classic_sigval"= "IMCRclassic",
+  "histoCAT_sigval" = "histoCAT",
+  "Misty_delauany" = "Misty",
+  "scimap"  = "Scimap",
+  "SEA_zscore_scimap" = "SEA",
+  "squidpy_count" = "Interaction count",
+  "squidpy_zscore" = "Squidpy"
+)
+rownames(df_merge) <- dplyr::recode(rownames(df_merge), !!!rename_map)
+# Define your custom order
+keep_rows <- c("Misty", "COZI", "histoCAT", "CellCharter*", "IMCRclassic", "Scimap", "Giotto", "CellCharter", "Squidpy", "SEA", "Interaction count")
+
+df_merge <- df_merge[rownames(df_merge) %in% keep_rows, , drop = FALSE]
+
+svg(output_path_appendix_Fig5_heatmap, width = 6, height = 2)
 pheatmap(as.matrix(df_merge),
          treeheight_row = 0,
          treeheight_col = 0)
@@ -396,6 +456,178 @@ dev.off()
 pheatmap(as.matrix(df_merge),
          treeheight_row = 0,
          treeheight_col = 0)
+
+```
+```{r}
+#save source data Sup fig 4b
+write.csv2(df_merge, "./../../../../../data/Source_data/Source_Sup_4b.csv", row.names = TRUE, fileEncoding = "UTF-8")
+
+```
+
+
+Generate ground truth to measure with cosine similarity
+```{r}
+# exlcude ct abundances, as not comparable to ground truth adjacencies
+features <- features[!grepl("ct_abundances", names(features))]
+
+vec = gsub("`", "", rownames(features[[1]]))
+ran = c(0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25)
+self0_0.6 = c(0.13, 0.6, 0.13, 0.14,0.29, 0.13, 0.29, 0.29, 0.29, 0.13, 0.29, 0.29, 0.29, 0.14, 0.29, 0.28)
+self0_0.45 = c(0.18, 0.45, 0.18, 0.19, 0.28, 0.18, 0.27, 0.27, 0.27, 0.19, 0.27, 0.27, 0.27, 0.18, 0.28, 0.27)
+
+ranks = data.frame(cross01_0.6_vs_ran = abs(ran - self0_0.6),
+                   ran_vs_cross01_0.6 = abs(ran - self0_0.6),
+                   cross01_0.45_vs_ran = abs(ran - self0_0.45),
+                   ran_vs_cross01_0.45 = abs(ran - self0_0.45),
+                   cross01_0.45_vs_cross01_0.6 = abs(self0_0.6 - self0_0.45),
+                   cross01_0.6_vs_cross01_0.45 = abs(self0_0.6 - self0_0.45))#
+
+rownames(ranks) = vec
+```
+
+### Cosine similarities
+
+We calculate cosine similarities between the ground truth NEP cohort differences and the feature importances
+```{r}
+# Define cosine similarity function
+cosine_similarity <- function(vector1, vector2) {
+  dot_product <- sum(vector1 * vector2)
+  magnitude1 <- sqrt(sum(vector1^2))
+  magnitude2 <- sqrt(sum(vector2^2))
+  return(((dot_product / (magnitude1 * magnitude2) + 1) / 2))  
+}
+
+
+cosine_similarities <- list()
+# Loop through each dataframe in features list
+for (i in seq_along(features)) {
+  # Only process if the dataframe has 16 rows
+  if (nrow(features[[i]]) == 16) {
+    
+    # Determine the ground truth based on column names of ranks
+    for (j in 1:ncol(ranks)) {
+      if (grepl(colnames(ranks)[j], names(features)[i]) == TRUE) {
+        ground_truth <- as.vector(ranks[, j])
+
+        cosine_similarities[[i]] <- sapply(features[[i]], function(col) {
+          cosine_similarity(col, ground_truth)
+        })
+        
+        break  # Exit the loop once the correct ground truth is found
+      }
+    }
+  }
+}
+
+# Name the list with the corresponding names of features
+names(cosine_similarities) <- names(features)
+cosine_similarities <- Filter(function(x) !is.null(x), cosine_similarities)
+cosine_similarities <- as.data.frame(do.call("rbind", cosine_similarities))
+```
+
+### Plotting Cosine Similarities
+
+```{r}
+# Cosine similarities w/o cell type abundances
+colnames(cosine_similarities) = 1:ncol(cosine_similarities)
+cosine_similarities$comparison <- sub(".*_sim_", "", rownames(cosine_similarities))
+
+# this is the comaprison without abundance: 
+cosine_similarities$comparison <- sub(".*_ab._[0-9]\\.[0-9]*_", "", rownames(cosine_similarities))
+cosine_similarities$tool <- sub("_ab.*", "", rownames(cosine_similarities))
+cosine_similarities$abundance_ct_0 = sub("^.*ab0_", "", rownames(cosine_similarities))
+cosine_similarities$abundance_ct_0 = sub("_[ran|self].*", "", cosine_similarities$abundance_ct_0)
+cosine_similarities$abundance_ct_0 = sub("_cross.*", "", cosine_similarities$abundance_ct_0)
+
+# now long data format
+cosine_similarities = gather(cosine_similarities, value = "cosine_similarity", key = "run", - c(tool, comparison, abundance_ct_0))
+unique(cosine_similarities$tool)
+
+
+custom_palette <- c("#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666", "#c44e52", "#f2a8aa","white", "#76B1F1")
+
+
+cosine_similarities_clean = cosine_similarities %>%
+   #filter(abundance_ct_0 != "0.05") %>%
+    mutate(tool = recode(tool,
+                       "ct" = "Cell type",
+                       "squidpy_count_delaunay" = "Interactions",
+                       "Giotto_delaunay" = "Giotto",
+                       "histoCAT_sigval_delaunay" = "histoCAT",
+                       "IMCRtools_classic_sigval_delaunay" = "IMCR classic",
+                       "Misty_delauany" = "Misty",
+                       "cond_zscore_scimap_delaunay" = "COZI",
+                       "cellcharter_enrichment_delaunay" = "Cellcharter",
+                       "cellcharter_notsymmetric_nohomo_enrichment_delaunay" = "Cellcharter*",
+                       "squidpy_zscore_delaunay" = "Squidpy",
+                       "scimap_delaunay" = "scimap",
+                       "SEA_zscore_scimap_delaunay" = "SEA"
+                       )) %>%
+  mutate(comparison = recode(comparison,
+                       "cross01_0.6_vs_ran" = "random vs strong",
+                       "ran_vs_cross01_0.6" = "random vs strong",
+                       "cross01_0.45_vs_cross01_0.6" = "weak vs strong",
+                       "cross01_0.6_vs_cross01_0.45" = "weak vs strong",
+                       "cross01_0.45_vs_ran" = "random vs weak",
+                       "ran_vs_cross01_0.45" = "random vs weak",
+                       ))
+
+cosine_similarities_clean_filtered =  cosine_similarities_clean 
+# Define your custom order
+custom_tool_order <- c("Interactions", "Giotto", "scimap", "histoCAT", "IMCR classic","SEA", "Squidpy", "Cellcharter", "Cellcharter*","COZI", "Misty")  
+cosine_similarities_clean_filtered$tool <- factor(cosine_similarities_clean_filtered$tool, levels = custom_tool_order)
+
+# Updated plot for publication
+image2 <- ggplot(cosine_similarities_clean_filtered, aes(x = tool, y = cosine_similarity)) +
+  geom_boxplot(aes(fill = tool), color = "black", outlier.size = 1, outlier.shape = 16) +
+  facet_grid(. ~ comparison) + 
+  theme_bw(base_size = 14) + 
+  theme(
+    axis.text.x = element_text(size = 12, angle = 45, vjust = 1, hjust = 1), 
+    axis.text.y = element_text(size = 12), 
+    strip.text = element_text(size = 14, face = "bold"),  
+    legend.position = "none",  
+
+  ) +
+  labs(
+    x = "Method", 
+    y = "Cosine similarity",  
+  ) +
+  scale_fill_manual(values = custom_palette) +  
+  coord_cartesian(ylim = c(0.5, 1))
+
+# Plot
+image2
+#ggsave(output_path_Fig3c_summary_boxplots_cosine, plot = image2, device = "svg", width = 8, height = 4.5)
+```
+
+```{r}
+# save sourcedata file
+cosine_similarities_clean_filtered <- na.omit(cosine_similarities_clean_filtered)
+cosine_similarities_clean_filtered$abundance_ct_0 <- recode(
+  cosine_similarities_clean_filtered$abundance_ct_0,
+  "0.05" = "0.14 - 0.22",
+  "0.1"  = "0.17 - 0.23",
+  "0.15" = "0.19 - 0.24",
+  "0.2"  = "0.22 - 0.24",
+  "0.25" = "0.25",
+  "0.35" = "0.26 - 0.31",
+  "0.45" = "0.28 - 0.36",
+  "0.55" = "0.29 - 0.41"
+)
+write.csv2(cosine_similarities_clean_filtered, "./../../../../../data/Source_data/Source_3c.csv", row.names = TRUE, fileEncoding = "UTF-8")
+```
+
+
+
+```{r}
+sessionInfo()
+
+# save files
+writeLines(capture.output({
+  print(R.version.string)  
+  sessioninfo::session_info()  
+}), "session_info.txt")
 ```
 
 

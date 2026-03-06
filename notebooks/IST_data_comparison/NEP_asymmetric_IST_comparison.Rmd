@@ -35,11 +35,11 @@ Paths to data and plots to be saved
 csv_dir = "./../../../20250218_results_asym/"
 
 #plot paths
-output_path_Figure3d_heatmaps_asym = "./../../../../../Paper_figures/condzscore_v3/heatmap_0110_values_asym_ab01_ab055_final.svg"
-output_path_Fig3b_boxplots_asym = "./../../../../../Paper_figures/condzscore_v3/asym_F1_detailed_2rows_final.svg"
-output_path_appendix_Fig3_summary_boxplots_F1_asym = "./../../../../../Paper_figures/condzscore_v3/appendix_asymmetric_comparison_F1_summary_w_0.05_final.svg"
-output_path_appendix_Fig5_heatmap = "./../../../../../Paper_figures/condzscore_v3/feature_importances_ran_vs_strong_0025_final.svg"
-output_path_Fig3c_summary_boxplots_cosine = "./../../../../../Paper_figures/condzscore_v3/asymmetric_comparison_cosinesim_summary_w_0.05_final.svg"
+output_path_Figure3d_heatmaps_asym = "./../../../../../Paper_figures/condzscore_v3/heatmap_0110_values_asym_ab01_ab055_finalsub.svg"
+output_path_Fig3b_boxplots_asym = "./../../../../../Paper_figures/condzscore_v3/asym_F1_detailed_2rows.svg"
+output_path_appendix_Fig3_summary_boxplots_F1_asym = "./../../../../../Paper_figures/condzscore_v3/appendix_asymmetric_comparison_F1_summary_w_0.05.svg"
+output_path_appendix_Fig5_heatmap = "./../../../../../Paper_figures/condzscore_v3/feature_importances_ran_vs_strong_0025.svg"
+output_path_Fig3c_summary_boxplots_cosine = "./../../../../../Paper_figures/condzscore_v3/asymmetric_comparison_cosinesim_summary_w_0.05.svg"
 
 # Set seed for reproducibility
 set.seed(123)
@@ -135,77 +135,132 @@ data
 ```
 
 Make specific plots for Fig 3d of raw NEP scores between red-yellow and yellow-red interactions
-```{r, fig.height = 10}
+```{r, fig.height = 12}
+all_source_data <- list()
 heatmaps <- list()
-# Initialize a reference for column order
-column_order <- NULL
-abundances = unique(all[[2]]$abundance)
+
+# --- output folder for per-round source tables ---
+source_folder <- "./../../../../../data/Source_data"
+dir.create(source_folder, showWarnings = FALSE, recursive = TRUE)
+
+# --- abundance relabel mapping (as requested) ---
+ab_map <- c(
+  "0.05" = "0.18 - 0.26",
+  "0.1"  = "0.20 - 0.26",
+  "0.15" = "0.21 - 0.26",
+  "0.2"  = "0.24 - 0.25",
+  "0.25" = "0.25",
+  "0.35" = "0.25-0.29",
+  "0.45" = "0.24-0.32",
+  "0.55" = "0.24-0.36"
+)
 
 # Loop over the patterns, excluding cell type abundance group
-for (i in c(1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12)) {
+for (i in c(1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) {
+
   # Calculate the means for each combination of preference and abundance
-    df = all[[i]] %>% filter(abundance != "ab0_0.05")
+  df <- all[[i]] %>%
+    dplyr::filter(abundance != "ab0_0.05")
+
+  result_matrix <- df %>%
+    dplyr::group_by(preference, abundance) %>%
+    dplyr::summarize(dplyr::across(where(is.numeric), mean, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::select(abundance, preference, `0_1`, `1_0`)
+
+  # --- TIDY source table (this is what you want to save) ---
+  source_tidy <- result_matrix %>%
+    tidyr::pivot_longer(cols = c(`0_1`, `1_0`),
+                        names_to = "pair_type",
+                        values_to = "value") %>%
+    dplyr::arrange(preference, abundance, pair_type)
+
+  # ---- method column: only text before first underscore ----
+  # e.g. "myMethod_xyz_123" -> "myMethod"
+  method_full <- as.character(data[i])
+  source_tidy$method <- sub("_.*$", "", method_full)
+
+  # ---- abundance relabel: supports both "0.05" and "ab0_0.05" forms ----
+  # 1) remove optional prefix like "ab0_"
+  ab_raw <- sub("^.*_", "", as.character(source_tidy$abundance))
+  # 2) map to new labels; unmapped values stay as original
+  source_tidy$abundance <- dplyr::recode(ab_raw, !!!ab_map, .default = ab_raw)
   
-    result_matrix <- df %>%
-      group_by(preference, abundance) %>% # Group by preference and abundance
-      summarize(across(where(is.numeric), mean, na.rm = TRUE)) %>%
-      select(abundance, preference, `0_1`, `1_0`)
-    
-    heatmap_data <- result_matrix %>%
-      pivot_longer(cols = starts_with("0_1"):starts_with("1_0"), names_to = "pair_type", values_to = "value") %>%
-      unite("abundance_type", abundance, pair_type, sep = "_") %>%
-      pivot_wider(names_from = abundance_type, values_from = value) %>%
-      as.data.frame()
-    
-    rownames(heatmap_data) = heatmap_data$preference
-    
-    heatmap_data <- heatmap_data %>%
-      select(preference, sort(names(.)[-1])) %>%
-      select(!preference)
-    
-    order_rows = c("ran", "cross01_0.45", "cross01_0.6")
-    heatmap_data <- heatmap_data[match(order_rows, rownames(heatmap_data)), ]
-    
-    # only make columnsnames for the last plot
-    if (i != 12){
-      heatmaps[[i]] = pheatmap(as.matrix(heatmap_data),
-             display_numbers = F, 
-             silent = TRUE, 
-             gaps_col = c(2, 4, 6, 8, 10, 12, 14),
-             main = data[i],
-             show_colnames = FALSE,
-             cluster_cols = F, 
-             cluster_rows = F)
-    }else{
-      heatmaps[[i]] = pheatmap(as.matrix(heatmap_data),
-             display_numbers = F, 
-             silent = TRUE, 
-             gaps_col = c(2, 4, 6, 8, 10, 12, 14),
-             main = data[i],
-             cluster_cols = F, 
-             cluster_rows = F)
-    }
+  source_tidy$preference <- dplyr::case_when(
+  grepl("0\\.45", source_tidy$preference) ~ "weak",
+  grepl("0\\.6",  source_tidy$preference) ~ "strong",
+  source_tidy$preference == "ran"        ~ "random",
+  TRUE ~ source_tidy$preference
+  )
+
+  # store in list (optional, if you still want it)
+  all_source_data[[as.character(i)]] <- source_tidy
+
+  # ---- SAVE ONE FILE PER ROUND ----
+  # clean filename from data[i]
+  safe_name <- gsub("[^A-Za-z0-9_\\-]+", "_", method_full)
+  out_file <- file.path(source_folder, paste0("Source_round_", i, "_", safe_name, ".csv"))
+
+  readr::write_excel_csv2(source_tidy, out_file)
+
+  # --- heatmap data (unchanged) ---
+  heatmap_data <- result_matrix %>%
+    tidyr::pivot_longer(cols = c(`0_1`, `1_0`),
+                        names_to = "pair_type",
+                        values_to = "value") %>%
+    tidyr::unite("abundance_type", abundance, pair_type, sep = "_") %>%
+    tidyr::pivot_wider(names_from = abundance_type, values_from = value) %>%
+    as.data.frame()
+
+  rownames(heatmap_data) <- heatmap_data$preference
+
+  heatmap_data <- heatmap_data %>%
+    dplyr::select(preference, sort(names(.)[-1])) %>%
+    dplyr::select(!preference)
+
+  order_rows <- c("ran", "cross01_0.45", "cross01_0.6")
+  heatmap_data <- heatmap_data[match(order_rows, rownames(heatmap_data)), , drop = FALSE]
+
+  # plot
+  if (i != 15) {
+    heatmaps[[i]] <- pheatmap::pheatmap(
+      as.matrix(heatmap_data),
+      display_numbers = FALSE,
+      silent = TRUE,
+      gaps_col = c(2, 4, 6, 8, 10, 12, 14),
+      main = data[i],
+      show_colnames = FALSE,
+      cluster_cols = FALSE,
+      cluster_rows = FALSE
+    )
+  } else {
+    heatmaps[[i]] <- pheatmap::pheatmap(
+      as.matrix(heatmap_data),
+      display_numbers = FALSE,
+      silent = TRUE,
+      gaps_col = c(2, 4, 6, 8, 10, 12, 14),
+      main = data[i],
+      cluster_cols = FALSE,
+      cluster_rows = FALSE
+    )
+  }
 }
 
 # Arrange heatmaps vertically using grid.arrange
 heatmaps <- heatmaps[-4]
 n <- length(heatmaps)
 
-# Create a layout matrix for stacking heatmaps vertically
 layout_matrix <- matrix(seq_len(n), ncol = 1)
-heights <- c(rep(1, n - 1), 2) # Last plot gets double the space
+heights <- c(rep(1, n - 1), 2)
 
-# Use grid.arrange with layout_matrix to arrange the heatmaps
-plot <- grid.arrange(
-  grobs = lapply(heatmaps, function(h) h$gtable), 
-  layout_matrix = layout_matrix, 
+plot <- gridExtra::grid.arrange(
+  grobs = lapply(heatmaps, function(h) h$gtable),
+  layout_matrix = layout_matrix,
   heights = heights
 )
-
-ggsave(output_path_Figure3d_heatmaps_asym,
-       plot = plot,
-       width = 5,
-       height = 9)
+#ggsave(output_path_Figure3d_heatmaps_asym,
+#       plot = plot,
+#       width = 5,
+#       height = 9)
 ```
 Naming convention for binary classification: Tool_x_vs_y
 
@@ -284,15 +339,17 @@ num_iterations <- 100
 # Run parallel loop
 foreach(i = 1:length(all), .combine = c, .packages = c("caret","randomForest")) %dopar% {
   ################################################################
-  #### for random model baseline in Appendix Figure 2, randomly shuffle the group_index
-  #group_index = sample(group_index)
-  ################################################################
+  
   set.seed(42 + i)  
+  
   data <- cbind(all[[i]], group_index)
   result <- list()
   
   for (x in 1:num_iterations){
     set.seed(42 + x)
+    ### for random model baseline in Appendix Figure 2, randomly shuffle the group_index
+    group_index = sample(group_index)
+    ################################################################
     # Split data into training and test sets
     trainIndex <- caret::createDataPartition(data$group_index, p = 0.8, list = FALSE, times = 1)
     train <- data[trainIndex, ]
@@ -373,7 +430,8 @@ mutate(tool = recode(tool,
                      "cellcharter_notsymmetric_nohomo_enrichment_delaunay" = "Cellcharter*",
                      "squidpy_zscore_delaunay" = "Squidpy",
                      "scimap_delaunay" = "scimap",
-                     "SEA_zscore_scimap_delaunay" = "SEA"
+                     "SEA_zscore_scimap_delaunay" = "SEA",
+                     "squidpy_cozi_delaunay" = "squidpy_cozi"
                      )) %>%
 mutate(comparison_preference = recode(comparison_preference,
                      "cross01_0.6_vs_ran" = "random vs strong",
@@ -407,12 +465,36 @@ image = ggplot(df_all_avg_clean, aes(x = factor(abundance_ct_0), y = F1, color =
   scale_colour_brewer(palette = "Dark2", name = "Cohort Comparison") +ylim(0.2,1)
 image
 
-ggsave(file = output_path_Fig3b_boxplots_asym, plot = image, width = 10, height = 6)
+#ggsave(file = output_path_Fig3b_boxplots_asym, plot = image, width = 10, height = 6)
 ```
+```{r}
+df_all_avg_clean
+```
+
+
+```{r}
+# print source data
+df_all_avg_clean$abundance_ct_0 <- recode(
+  df_all_avg_clean$abundance_ct_0,
+  "0.05" = "0.18 - 0.26",
+  "0.1"  = "0.20 - 0.26",
+  "0.15" = "0.21 - 0.26",
+  "0.2"  = "0.24 - 0.25",
+  "0.25" = "0.25",
+  "0.35" = "0.25-0.29",
+  "0.45" = "0.24-0.32",
+  "0.55" = "0.24-0.36"
+)
+df_all_avg_clean
+#unique(df_all_avg_clean$abundance_ct_0)
+df = df_all_avg_clean %>% select(tool, comparison_preference, abundance_ct_0, F1)
+write.csv2(df, "./../../../../../data/Source_data/Source_Sup_1b.csv", row.names = TRUE, fileEncoding = "UTF-8")
+```
+
 
 Add a summary boxplot to it
 ```{r, fig.width = 9}
-df_all_avg_clean_filtered =  df_all_avg_clean #%>% filter(abundance_ct_0 != "0.05")
+df_all_avg_clean_filtered =  df_all_avg_clean #%>% filter(abundance_ct_0 != "0.18 - 0.26")
 custom_palette <- c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666", "#c44e52", "#f2a8aa","white", "#76B1F1")
 
 image2 <- ggplot(df_all_avg_clean_filtered, aes(x = tool, y = F1)) +
@@ -438,6 +520,7 @@ image2
 
 # save the images, either for the symmetric or asymmetric dataset
 ggsave(output_path_appendix_Fig3_summary_boxplots_F1_asym, plot = image2, device = "svg", width = 8, height = 4.5)
+ggsave("./../../../../../Paper_figures/condzscore_v3/Appendix_fig_1b.svg", plot = image2, device = "svg", width = 8, height = 4.5)
 ```
 
 ## Plotting Feature importances and Cosine similarity for asymmetric dataset
@@ -484,6 +567,7 @@ dev.off()
 pheatmap(as.matrix(df_merge),
          treeheight_row = 0,
          treeheight_col = 0)
+
 ```
 Generate ground truth to measure with cosine similarity
 ```{r}

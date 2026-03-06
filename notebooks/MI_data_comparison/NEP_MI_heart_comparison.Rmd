@@ -16,9 +16,9 @@ read the datasets
 csv_dir = "./../../../../Comparison/20250218_results_MI/"
 
 # output_paths
-output_path_NEP_immune_Endocardial_Fig4d_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Fig4d_MI_data_heatmaps_final.svg"
-output_path_NEP_immune_Ankrd1_Fig4c_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Fig4c_MI_NEP_immune_Ankrd1_heatmaps_final.svg"
-output_path_NEP_immune_Endothelial_appendix_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Appendix_Fig_MI_NEP_immune_Endothelial_heatmaps_final.svg"
+output_path_NEP_immune_Endocardial_Fig4d_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Fig4d_MI_data_heatmaps_norm_t.svg"
+output_path_NEP_immune_Ankrd1_Fig4c_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Fig4c_MI_NEP_immune_Ankrd1_heatmaps_norm_t.svg"
+output_path_NEP_immune_Endothelial_appendix_heatmaps = "./../../../../../Paper_figures/condzscore_v3/Appendix_Fig_MI_NEP_immune_Endothelial_heatmaps_norm_t.svg"
 ```
 
 
@@ -65,7 +65,9 @@ method_renames <- c(
   "MI_scimap_knn5.csv" = "Scimap",
   "MI_SEA_scimap_knn5.csv" = "SEA",
   "squidpy_count_knn5_delaunay.csv" = "Interaction count",
-  "squidpy_zscore_knn5_delaunay.csv" = "Squidpy"
+  "squidpy_zscore_knn5_delaunay.csv" = "Squidpy",
+  "MI_COZI_normalized_knn5.csv" = "COZI_norm",
+  "squidpy_cozi_knn5_delaunay_t.csv" = "squidpy_cozi"
 )
 
 order_rownames = c("Control_13", "Control_12", "Control_14", "4h_97", "4h_96", "24h_83", "24h_86", "48h_79", "48h_76")
